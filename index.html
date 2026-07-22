@@ -943,6 +943,9 @@
             appId: "1:466623887943:web:043655c8b92fc03c198f62"
         };
 
+        // `gameRef` points at the single shared game document in Realtime Database
+        // (games/default). Every screen (teacher console + each team) subscribes to
+        // this same node so state stays in sync across devices with no server code.
         let db, gameRef;
         try {
             firebase.initializeApp(firebaseConfig);
@@ -963,10 +966,14 @@
         // keeps every possible AMBUSH order the same length, so ciphertext length alone can't give away
         // which agency is being targeted before anyone even tries to crack it.
         const CODE_OF = { red: 'RUBY', blue: 'AQUA', green: 'LIME', yellow: 'GOLD', purple: 'PLUM', orange: 'RUST' };
+        // Reverse lookup: 4-letter codename -> colour, used when parsing submitted AMBUSH orders.
         const COLOUR_OF_CODE = {};
         Object.keys(CODE_OF).forEach(c => { COLOUR_OF_CODE[CODE_OF[c]] = c; });
         const CODE_LIST = Object.values(CODE_OF);
+        // Matches a full "AMBUSH <CODENAME>" order once normalised to uppercase.
         const AMBUSH_RE = new RegExp('^AMBUSH (' + CODE_LIST.join('|') + ')$');
+        // Adjacency map: for every board square, the orthogonally neighbouring squares
+        // it can legally MOVE to/from (used for suggesting/validating moves).
         const ADJ = {};
         SQUARES.forEach(sq => {
             const col = sq[0], row = parseInt(sq.slice(1), 10);
@@ -979,8 +986,11 @@
             ADJ[sq] = neighbours;
         });
 
+        // Word banks used to auto-generate a random "Adjective Noun" codename for each
+        // team that joins (e.g. "Silver Falcon"), avoiding collisions with existing names.
         const NAME_ADJ = ['Silver', 'Iron', 'Crimson', 'Shadow', 'Golden', 'Midnight', 'Silent', 'Rogue', 'Arctic', 'Obsidian', 'Scarlet', 'Ghost'];
         const NAME_NOUN = ['Falcon', 'Wolf', 'Hawk', 'Fox', 'Serpent', 'Raven', 'Panther', 'Cobra', 'Phantom', 'Tiger', 'Viper', 'Eagle'];
+        /** Picks a random unused "Adjective Noun" codename, falling back to a numbered agency name if all combinations tried are taken. */
         function generateTeamName(existingNamesLower) {
             for (let i = 0; i < 40; i++) {
                 const name = NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)] + ' ' + NAME_NOUN[Math.floor(Math.random() * NAME_NOUN.length)];
@@ -989,17 +999,23 @@
             return 'Agency ' + Math.floor(1000 + Math.random() * 9000);
         }
 
+        /** Caesar-cipher encrypt: shifts each A-Z letter by `shift` positions (wrapping), leaving other characters untouched. Passing `26 - shift` decrypts. */
         function caesarEncrypt(text, shift) {
             return text.toUpperCase().split('').map(ch => {
                 if (ch >= 'A' && ch <= 'Z') return String.fromCharCode(((ch.charCodeAt(0) - 65 + shift) % 26) + 65);
                 return ch;
             }).join('');
         }
+        /** Uppercases, collapses repeated whitespace, and trims — used so guesses/orders compare equal regardless of spacing/case. */
         function normalize(s) { return s.toUpperCase().replace(/\s+/g, ' ').trim(); }
+        /** Capitalises just the first letter of a string (e.g. colour names for display). */
         function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+        /** Returns a new array containing the same elements in random order (Fisher-Yates). */
         function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; } return a; }
+        /** Generates a short random id (e.g. "tm3f9d1a2") used as a team's Firebase key. */
         function genId() { return 'tm' + Math.random().toString(36).slice(2, 9); }
 
+        /** Builds a brand-new game object with default lobby phase, round 1, and empty teams/grid/log — used on first load and on reset. */
         function freshGameState() {
             return {
                 phase: 'lobby', round: 1, maxRounds: 4, sessionId: 's' + Date.now(), practice: false,
@@ -1008,6 +1024,7 @@
             };
         }
 
+        /** Builds the starting board ownership map: each fixed base square (see BASES) is assigned to whichever team currently holds that colour. */
         function baseGridFor(teams) {
             const grid = {};
             Object.keys(BASES).forEach(sq => {
@@ -1019,6 +1036,7 @@
         }
 
         /* ---------------- role routing ---------------- */
+        /** Entry point from the landing screen: routes to the teacher console, or — for a team — either resumes a saved session (via localStorage) or auto-joins a new one. */
         function goRole(role) {
             if (role === 'teacher') {
                 show('screen-teacher'); initTeacherView();
@@ -1040,6 +1058,7 @@
                 }
             }
         }
+        /** Single-page-app style screen switcher: shows only the screen with the given element id, hiding all the others. */
         function show(id) {
             ['screen-landing', 'screen-teacher', 'screen-team-join', 'screen-team', 'screen-decoder'].forEach(s => {
                 document.getElementById(s).classList.toggle('hidden', s !== id);
@@ -1049,16 +1068,19 @@
         /* ---------------- standalone decoder wheel (no game/Firebase involvement) ---------------- */
         const WHEEL_ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+        /** Opens the standalone decoder wheel screen, independent of any game/Firebase state — usable offline for practising Caesar ciphers. */
         function goDecoder() {
             show('screen-decoder');
             updateDecoderOutput();
         }
 
+        /** Converts a wheel angle (degrees, 0 = top, clockwise) into an (x, y) point on a circle of radius `r` centred at (cx, cy). Used to place each letter around the decoder wheel. */
         function wheelPolarPoint(cx, cy, r, angleDeg) {
             const rad = (angleDeg - 90) * Math.PI / 180;
             return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
         }
 
+        /** Redraws the two concentric letter rings of the decoder wheel SVG: the fixed outer ring (A-Z) and the inner ring rotated by `shift` positions. */
         function renderWheel(shift) {
             const cx = 200, cy = 200, outerR = 168, innerR = 106;
             let outerHTML = '', innerHTML = '';
@@ -1076,6 +1098,7 @@
         let lastAcceptedShift = 1;
         let shiftCooldownUntil = 0;
 
+        /** Re-renders the wheel and decrypted plaintext for the current shift/ciphertext input. */
         function updateDecoderOutput() {
             const shift = ((lastAcceptedShift % 26) + 26) % 26;
             const cipherText = document.getElementById('decoder-input').value;
@@ -1084,6 +1107,7 @@
             renderWheel(shift);
         }
 
+        /** Handles the shift input control, throttled with a 2s cooldown (disabling the input) to stop rapid-fire changes from spamming re-renders. */
         function onDecoderShiftChange() {
             const el = document.getElementById('decoder-shift');
             const now = Date.now();
@@ -1099,18 +1123,23 @@
             setTimeout(() => { el.disabled = false; }, 2000);
         }
 
+        /** Handles edits to the ciphertext-to-decode textbox. */
         function onDecoderCipherChange() {
             updateDecoderOutput();
         }
 
 
-        /* ================= TEACHER VIEW ================= */
+        /* ================= TEACHER VIEW =================
+           The teacher console is the source of truth for game flow: it starts/ends
+           rounds, reveals submitted orders one at a time, times each reveal, and
+           resolves the outcome (move/ambush success or failure) into the shared grid. */
         let teacherState = null;
         let revealTimerHandle = null;
         let teacherResolvePanelOpen = false;
         let pendingGrid = null;
         let resolveBaseGrid = null;
 
+        /** Subscribes the teacher console to the live game state, initialising a fresh game if none exists yet, and re-rendering on every change. */
         function initTeacherView() {
             gameRef.on('value', snap => {
                 let g = snap.val();
@@ -1120,9 +1149,12 @@
             });
         }
 
+        /** Looks up a team's display name by id, falling back to a placeholder if the team is missing. */
         function teamName(g, id) { return (g.teams && g.teams[id] && g.teams[id].name) || '(unknown)'; }
+        /** Looks up a team's assigned colour by id. */
         function teamColour(g, id) { return g.teams && g.teams[id] && g.teams[id].colour; }
 
+        /** Main teacher-console render function: draws the lobby/round/scoreboard UI for the current game phase (lobby, submitting, revealing, roundend, ended). */
         function renderTeacher(g) {
             document.getElementById('phase-pill').textContent = g.practice && g.phase !== 'lobby' && g.phase !== 'ended' ? 'PRACTICE' : g.phase.toUpperCase();
             document.getElementById('phase-pill').classList.toggle('live', g.phase !== 'lobby' && g.phase !== 'ended');
@@ -1184,6 +1216,7 @@
             if (g.phase === 'ended') renderFinal('final-ranking', g);
         }
 
+        /** Renders the "reveal" panel shown while stepping through each team's submitted order one at a time during the revealing phase. */
         function renderRevealPanel(g) {
             const cr = g.currentReveal;
             document.getElementById('t-reveal-index').textContent = g.revealIdx + 1;
@@ -1203,6 +1236,7 @@
             if (!revealTimerHandle) revealTimerHandle = setInterval(() => tickTimer('teacher'), 250);
         }
 
+        /** Interval callback that counts down the current reveal's timer display (for either the 'teacher' or 'team' view) and flags it as ended once it reaches zero. */
         function tickTimer(who) {
             gameRef.child('currentReveal').once('value').then(snap => {
                 const cr = snap.val();
@@ -1214,6 +1248,7 @@
             });
         }
 
+        /** Randomly reassigns colours across all currently joined teams (lobby-only action) — useful if the teacher wants a different colour spread before starting. */
         function reshuffleColours() {
             if (!confirm('Reshuffle everyone\'s assigned colour? Any team already looking at their colour will see it change.')) return;
             gameRef.once('value').then(snap => {
@@ -1227,6 +1262,7 @@
             });
         }
 
+        /** Transitions the game from lobby to the first submitting round, seeding the starting grid from each team's assigned base colour. */
         function teacherStartGame() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1238,6 +1274,7 @@
             });
         }
 
+        /** Starts a practice round (flagged with `practice: true`) that doesn't count toward scoring, letting teams rehearse the submit/reveal flow. */
         function teacherStartPractice() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1250,6 +1287,7 @@
             });
         }
 
+        /** Ends the current practice round and returns the game to the lobby without affecting scores or the real grid. */
         function teacherEndPractice() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1264,6 +1302,7 @@
             });
         }
 
+        /** Moves the game into the revealing phase once all submissions are in, building the (shuffled) order in which team orders will be revealed. */
         function beginRevealPhase() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1273,6 +1312,7 @@
             });
         }
 
+        /** Begins revealing the given team's submitted order: publishes its ciphertext to `currentReveal` and starts the crack-attempt timer for everyone else. */
         function startReveal(teamId) {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1286,8 +1326,10 @@
             });
         }
 
+        /** Lets the teacher end the current reveal's countdown early (e.g. once everyone has guessed). */
         function stopTimerEarly() { gameRef.child('currentReveal/timerEnded').set(true); }
 
+        /** Opens the teacher's resolution panel for the current reveal, preloading a suggested grid based on the order type (MOVE/AMBUSH) and outcome. */
         function openResolvePanel() {
             clearInterval(revealTimerHandle); revealTimerHandle = null;
             teacherResolvePanelOpen = true;
@@ -1321,6 +1363,7 @@
             document.getElementById('teacher-resolve-panel').classList.remove('hidden');
         }
 
+        /** Recomputes the suggested grid whenever the teacher changes the outcome dropdown (e.g. switching between success/failure) in the resolve panel. */
         function onOutcomeChange() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1335,6 +1378,7 @@
             });
         }
 
+        /** Builds the human-readable summary line shown in the resolve panel describing the order's result and who (if anyone) cracked it. */
         function renderResolveNote(result, outcome, crackedBy) {
             const el = document.getElementById('resolve-note');
             const notes = [];
@@ -1347,6 +1391,7 @@
             el.innerHTML = notes.map(n => `<p class="muted" style="color:var(--amber);">${n}</p>`).join('');
         }
 
+        /** Computes the suggested board-ownership grid that would result from applying the given order (MOVE/AMBUSH) and outcome, without committing it — the teacher can still hand-edit before applying. */
         function suggestGridForOutcome(baseGrid, g, cr, sub, outcome) {
             const grid = { ...baseGrid };
             if (outcome === 'block') return { grid, valid: true, reason: '' };
@@ -1382,6 +1427,7 @@
             return { grid, valid: true, reason: '' };
         }
 
+        /** Commits the teacher's resolved grid/outcome for the current reveal to the shared game state, updates scores, and advances to the next reveal or round end. */
         function applyResolution() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1414,6 +1460,7 @@
             });
         }
 
+        /** Cycles a grid square's owner through the list of available team colours (used when the teacher manually edits the suggested grid). */
         function cycleOwner(sq) {
             const grid = pendingGrid || { ...resolveBaseGrid };
             const order = [null, 'red', 'blue', 'green', 'yellow', 'purple', 'orange'];
@@ -1424,6 +1471,7 @@
             renderGridInto('resolve-grid', resolveBaseGrid, true);
         }
 
+        /** Draws the 6x5 board grid into the given container element, colouring each square by its current owner; squares are clickable to cycle owner when `editable` is true. */
         function renderGridInto(elId, grid, editable) {
             const el = document.getElementById(elId);
             el.innerHTML = SQUARES.map(sq => {
@@ -1437,6 +1485,7 @@
             }).join('');
         }
 
+        /** Renders the live scoreboard (team names, colours, scores) into the given container, sorted by score. */
         function renderScoreboardInto(elId, g) {
             const teams = g.teams || {};
             const grid = g.grid || {};
@@ -1451,6 +1500,7 @@
             ).join('') || '<p class="muted">No teams yet.</p>';
         }
 
+        /** Renders the final end-of-game ranking table into the given container once the game has ended. */
         function renderFinal(elId, g) {
             const teams = g.teams || {};
             const grid = g.grid || {};
@@ -1464,11 +1514,13 @@
             ).join('');
         }
 
+        /** Renders the running activity log (most recent first) into the given container. */
         function renderLog(elId, log) {
             const el = document.getElementById(elId);
             el.innerHTML = (log || []).slice().reverse().map(l => `<div class="entry">${escapeHtml(l)}</div>`).join('') || '<p class="muted">No activity yet.</p>';
         }
 
+        /** Advances the game to the next round, clearing submissions/reveal state ready for teams to submit new orders. */
         function teacherNextRound() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -1478,6 +1530,7 @@
                 });
             });
         }
+        /** Ends the game after teacher confirmation, moving to the final results screen. */
         function teacherEndGame() {
             if (!confirm('End the game now and show final results?')) return;
             gameRef.once('value').then(snap => {
@@ -1485,6 +1538,7 @@
                 gameRef.update({ phase: 'ended', currentReveal: null, log: [...(g.log || []), logEntry(g, 'Game ended by console.')] });
             });
         }
+        /** Wipes the entire game back to a fresh lobby state after teacher confirmation — clears all teams, scores and colours. */
         function confirmReset() {
             if (confirm('Reset the entire game? All teams, names, colours and scores will be cleared.')) {
                 clearInterval(revealTimerHandle); revealTimerHandle = null;
@@ -1493,10 +1547,14 @@
             }
         }
 
-        /* ================= TEAM VIEW ================= */
+        /* ================= TEAM VIEW =================
+           Handles a single team's device: joining/rejoining the game, saving their
+           codename and cipher shift, submitting encrypted orders each round, and
+           attempting to crack other teams' messages during the reveal phase. */
         let myTeamId = null;
         let teamTimerHandle = null;
 
+        /** Auto-joins this device to the game as a brand-new team: atomically claims an id, an unused colour and a generated codename via a Firebase transaction, then remembers the team in localStorage. */
         function autoJoinTeam() {
             show('screen-team-join');
             const statusEl = document.getElementById('join-status-msg');
@@ -1536,6 +1594,7 @@
             });
         }
 
+        /** Validates and saves this team's chosen codename and cipher shift while the game is still in the lobby, rejecting duplicate/invalid names or out-of-range shifts. */
         function saveSetup() {
             const nameInput = document.getElementById('teamname-input');
             const shiftInput = document.getElementById('shift-input');
@@ -1568,6 +1627,7 @@
             });
         }
 
+        /** Clears this team's saved setup (assigns a new random codename, clears the shift) so they can re-enter their details, only while still in the lobby. */
         function resetSetup() {
             const statusEl = document.getElementById('setup-status');
             gameRef.once('value').then(snap => {
@@ -1590,12 +1650,14 @@
             });
         }
 
+        /** Forgets this device's saved team membership and reloads the page, returning to the landing/join flow. */
         function leaveTeam() {
             localStorage.removeItem('eaa_team_id');
             localStorage.removeItem('eaa_session');
             location.reload();
         }
 
+        /** Subscribes this device to live game updates as the given team, redirecting back to landing if the session/team becomes invalid (e.g. after a reset). */
         function enterTeamScreen(id) {
             myTeamId = id;
             show('screen-team');
@@ -1616,6 +1678,7 @@
             });
         }
 
+        /** Main team-screen render function: updates the badge, setup form, board, legend, incoming-message panel and phase-specific panel (waiting/submit/round-end/ended) for this team. */
         function renderTeamView(g, id) {
             const t = g.teams[id];
             const badge = document.getElementById('team-badge');
@@ -1702,6 +1765,7 @@
             renderScoreboardInto('team-scoreboard', g);
         }
 
+        /** Validates a raw order string against the MOVE/AMBUSH grammar, returning `{valid, message}` for inline feedback before encryption/submission. */
         function validateOrderText(raw) {
             const text = raw.trim().toUpperCase().replace(/\s+/g, ' ');
             if (!text) return { valid: null, message: '' };
@@ -1715,6 +1779,7 @@
             return { valid: false, message: `✗ Doesn't match MOVE <from> <to> (e.g. MOVE A1 A2) or AMBUSH <codename> (e.g. AMBUSH ${CODE_LIST[0]}) — codenames are on the legend below the map.` };
         }
 
+        /** Shows a live encrypted preview of the plaintext order box, using this team's saved cipher shift. */
         function updateCipherPreview() {
             const raw = document.getElementById('plaintext-input').value;
             const validity = validateOrderText(raw);
@@ -1728,6 +1793,7 @@
             });
         }
 
+        /** Validates, encrypts and submits this team's order for the current round (requires a shift to already be set). */
         function submitCommand() {
             const raw = document.getElementById('plaintext-input').value;
             const statusEl = document.getElementById('team-submit-status');
@@ -1745,6 +1811,7 @@
             });
         }
 
+        /** Submits this team's guess at the plaintext of the currently revealed message and records whether it was correct. */
         function submitCrack() {
             const guess = normalize(document.getElementById('tc-guess-input').value);
             gameRef.once('value').then(snap => {
@@ -1759,7 +1826,9 @@
         }
 
         /* ---------------- helpers ---------------- */
+        /** Formats a log message prefixed with the current round number, e.g. "[R2] Round 2 begins." */
         function logEntry(g, msg) { return `[R${g.round}] ${msg}`; }
+        /** Escapes a string for safe insertion as HTML text content (guards against team-supplied names/messages containing markup). */
         function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     </script>
 </body>
