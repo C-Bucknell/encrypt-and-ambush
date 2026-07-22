@@ -182,7 +182,7 @@
     <div class="role-card" onclick="goDecoder()">
       <span class="role-tag">Helper tool</span>
       <h3>Decoder wheel</h3>
-      <p>Not tied to any game — a standalone Caesar-cipher wheel for practising, or for a spare pair of hands to help crack a message.</p>
+      <p>Caesar-cipher wheel for practising, or for a spare pair of hands to help crack a message.</p>
     </div>
   </div>
 </div>
@@ -205,6 +205,7 @@
         <p class="hint">Names and colours are assigned automatically the moment each team joins — no action needed from you.</p>
         <div class="divider"></div>
         <button class="block ghost" id="btn-reshuffle" onclick="reshuffleColours()" disabled>Reshuffle colours</button>
+        <button class="block ghost" id="btn-start-practice" style="margin-top:10px;" onclick="teacherStartPractice()" disabled>Start practice round</button>
         <button class="block" id="btn-start-game" style="margin-top:10px;" onclick="teacherStartGame()" disabled>Start game</button>
       </div>
 
@@ -217,10 +218,7 @@
 
       <div class="panel hidden" id="teacher-reveal-panel">
         <h3>Intercept <span id="t-reveal-index">1</span> of <span id="t-reveal-total">4</span></h3>
-        <div class="center" style="margin-bottom:10px;">
-          <span class="muted">Transmitting team:</span>
-          <strong id="t-reveal-team"></strong>
-        </div>
+        <p class="muted center" style="margin-bottom:10px;">Sender identity is hidden until the clock stops — this keeps the crack fair.</p>
         <div class="slip">
           <div class="slip-label">Intercepted transmission — encrypted</div>
           <div class="cipher-text" id="t-cipher-display">— — —</div>
@@ -253,10 +251,11 @@
       </div>
 
       <div class="panel hidden" id="teacher-roundend-panel">
-        <h3>Round <span id="rend-num">1</span> complete</h3>
-        <p class="muted">All orders for this round have been resolved.</p>
+        <h3 id="rend-heading">Round 1 complete</h3>
+        <p class="muted" id="rend-caption">All orders for this round have been resolved.</p>
         <div class="divider"></div>
         <button class="block" id="btn-next-round" onclick="teacherNextRound()">Start round <span id="rend-next">2</span></button>
+        <button class="block" id="btn-end-practice" onclick="teacherEndPractice()">Start the real game</button>
       </div>
 
       <div class="panel hidden" id="teacher-ended-panel">
@@ -310,47 +309,17 @@
   </div>
   <div class="wrap" style="max-width:640px;">
 
-    <div class="panel" style="border-color:var(--amber-dim);">
-      <h3>How to play</h3>
-      <div class="hint" style="line-height:1.85; font-size:12.5px;">
-        <strong style="color:var(--amber);">Goal:</strong> finish with the most points.
-        <strong>Points</strong> = every square you control on the map, <strong>+1</strong> for
-        every enemy order you successfully crack.<br><br>
-        <strong style="color:var(--amber);">Each round:</strong><br>
-        1&#41; Make sure your setup below is saved (only needs doing once).<br>
-        2&#41; Type <strong>one</strong> order, check the encrypted version, and submit it.<br>
-        3&#41; Once every agency has submitted, the console reveals one order at a time. Watch the
-        <strong>Incoming message</strong> panel below — you get 30 seconds to crack it.<br>
-        4&#41; A cracked order is blocked and the cracking agency scores a point. An uncracked order
-        happens exactly as written.
-      </div>
-    </div>
-
     <div class="panel">
       <h3>Setup</h3>
-      <div class="grid2-tight" style="margin-top:0;">
-        <div>
-          <label>Codename (auto-assigned — change any time)</label>
-          <input type="text" id="teamname-input" maxlength="24">
-          <label>Caesar shift (1–25) — set once, locks when the game starts</label>
-          <input type="number" id="shift-input" min="1" max="25" placeholder="e.g. 7">
-          <button class="block" style="margin-top:10px;" id="btn-save-setup" onclick="saveSetup()">Save</button>
-          <p class="hint" id="setup-status"></p>
-        </div>
-        <div>
-          <p class="hint" style="margin-top:0; line-height:1.8;">
-            <strong style="color:var(--amber);">Commands — pick one per round:</strong><br>
-            <code class="cmd-move">MOVE &lt;from&gt; &lt;to&gt;</code> — claim a square. <code>&lt;from&gt;</code>
-            must be a square you already control; <code>&lt;to&gt;</code> must be directly
-            adjacent (up/down/left/right, no diagonals) and not already enemy-held.<br><br>
-            <code class="cmd-ambush">AMBUSH &lt;codename&gt;</code> — strip one square from a rival agency, anywhere
-            on the board. Codenames are always 4 letters (see the legend under the map) so
-            ciphertext length never gives away the target.<br><br>
-            Squares: columns <strong>A–F</strong>, rows <strong>1–5</strong> — A1 is top-left,
-            F5 is bottom-right.
-          </p>
-        </div>
+      <label>Codename (auto-assigned — change any time)</label>
+      <input type="text" id="teamname-input" maxlength="24">
+      <label>Caesar shift (1–25) — set once, locks when the game starts</label>
+      <input type="number" id="shift-input" min="1" max="25" placeholder="e.g. 7">
+      <div class="row" style="margin-top:10px;">
+        <button onclick="saveSetup()" id="btn-save-setup">Save</button>
+        <button class="ghost" onclick="resetSetup()" id="btn-reset-setup">Reset</button>
       </div>
+      <p class="hint" id="setup-status"></p>
     </div>
 
     <div class="panel">
@@ -365,7 +334,7 @@
       <h3>Incoming message</h3>
       <div id="incoming-idle" class="muted">No incoming intercept right now — this lights up the moment the console reveals a transmission.</div>
       <div id="incoming-active" class="hidden">
-        <div class="center muted" style="margin-bottom:8px;">Transmitting: <strong id="tc-team-name"></strong></div>
+        <div class="center muted" style="margin-bottom:8px;">Intercept <strong id="tc-index"></strong> — sender hidden until resolved</div>
         <div class="slip incoming-live" id="tc-slip">
           <div class="slip-label">Encrypted transmission</div>
           <div class="cipher-text" id="tc-cipher"></div>
@@ -388,16 +357,25 @@
 
     <div class="panel hidden" id="team-submit-panel">
       <h3>Round <span id="team-round-num">1</span> — Encrypt your order</h3>
-      <p class="hint">Reminder: <code class="cmd-move">MOVE A1 A2</code> or <code class="cmd-ambush">AMBUSH RUBY</code> — full rules are
-        in "How to play" above. One order per round.</p>
-      <label>Plain text order</label>
-      <textarea id="plaintext-input" placeholder="e.g. MOVE A1 A2" maxlength="40" oninput="updateCipherPreview()"></textarea>
-      <p class="hint" id="plaintext-validity" style="margin-top:4px;"></p>
-      <label>Encrypted (this is what gets submitted)</label>
-      <input type="text" id="ciphertext-preview" readonly style="color:var(--amber); font-weight:600;">
-      <div class="divider"></div>
-      <button class="block" onclick="submitCommand()">Submit encrypted order</button>
-      <p class="muted center" id="team-submit-status" style="margin-top:10px;"></p>
+      <div class="grid2-tight" style="margin-top:0;">
+        <div>
+          <label>Plain text order</label>
+          <textarea id="plaintext-input" placeholder="e.g. MOVE A1 A2" maxlength="40" oninput="updateCipherPreview()"></textarea>
+          <p class="hint" id="plaintext-validity" style="margin-top:4px;"></p>
+          <label>Encrypted (this is what gets submitted)</label>
+          <input type="text" id="ciphertext-preview" readonly style="color:var(--amber); font-weight:600;">
+          <div class="divider"></div>
+          <button class="block" onclick="submitCommand()">Submit encrypted order</button>
+          <p class="muted center" id="team-submit-status" style="margin-top:10px;"></p>
+        </div>
+        <div>
+          <p class="hint" style="margin-top:0; line-height:2;">
+            <code class="cmd-move">MOVE A1 A2</code><br><span class="muted">→ claim an adjacent square</span><br><br>
+            <code class="cmd-ambush">AMBUSH RUBY</code><br><span class="muted">→ strip any enemy square</span><br><br>
+            <span class="muted">One order per round. Squares A–F, 1–5.</span>
+          </p>
+        </div>
+      </div>
     </div>
 
 
@@ -408,6 +386,7 @@
 
     <div class="panel">
       <h3>Scoreboard</h3>
+      <p class="hint" style="margin-top:0;">Score = squares held + successful cracks (+1 each).</p>
       <div id="team-scoreboard"></div>
     </div>
 
@@ -440,7 +419,7 @@
             <circle cx="200" cy="200" r="58" fill="#171b1e" stroke="#7a6631" stroke-width="1.5"/>
             <text x="200" y="182" text-anchor="middle" fill="#8a9199" font-family="'Space Grotesk', sans-serif" font-size="10" letter-spacing="1">SHIFT</text>
             <foreignObject x="160" y="188" width="80" height="38">
-              <input xmlns="http://www.w3.org/1999/xhtml" type="number" id="decoder-shift" min="0" max="25" value="1" oninput="updateDecoderOutput()"
+              <input xmlns="http://www.w3.org/1999/xhtml" type="number" id="decoder-shift" min="0" max="25" value="1" oninput="onDecoderShiftChange()"
                 style="width:100%; height:100%; box-sizing:border-box; background:transparent; border:none; outline:none; text-align:center; color:#e8b84b; font-family:'Space Grotesk', sans-serif; font-size:24px; font-weight:700; padding:0;">
             </foreignObject>
             <polygon points="200,14 191,32 209,32" fill="#e8b84b"/>
@@ -448,13 +427,13 @@
         </div>
         <div>
           <label>Cipher text</label>
-          <textarea id="decoder-input" placeholder="Paste or type the encrypted message here..." oninput="updateDecoderOutput()" style="min-height:120px;"></textarea>
+          <textarea id="decoder-input" placeholder="Paste or type the encrypted message here..." oninput="onDecoderCipherChange()" style="min-height:120px;"></textarea>
           <label style="margin-top:14px;">Decoded plain text</label>
           <div class="slip" style="margin-top:4px;">
             <div class="slip-label">Result</div>
             <div class="cipher-text" id="decoder-output" style="font-size:19px;">—</div>
           </div>
-          <p class="hint" style="margin-top:12px;">Set the shift in the wheel, Enter in
+          <p class="hint" style="margin-top:12px;">Set the shift in the wheel, paste in
             ciphertext, and the plain text appears above.</p>
         </div>
       </div>
@@ -540,10 +519,20 @@ function genId(){ return 'tm' + Math.random().toString(36).slice(2,9); }
 
 function freshGameState(){
   return {
-    phase:'lobby', round:1, maxRounds:4, sessionId:'s'+Date.now(),
+    phase:'lobby', round:1, maxRounds:4, sessionId:'s'+Date.now(), practice:false,
     teams:{}, grid:{}, submissions:{}, revealOrder:[], revealIdx:-1,
     currentReveal:null, crackAttempts:{}, log:[]
   };
+}
+
+function baseGridFor(teams){
+  const grid = {};
+  Object.keys(BASES).forEach(sq=>{
+    const c = BASES[sq];
+    const ownerId = Object.keys(teams).find(id=>teams[id].colour===c);
+    if(ownerId) grid[sq]=c;
+  });
+  return grid;
 }
 
 /* ---------------- role routing ---------------- */
@@ -601,13 +590,34 @@ function renderWheel(shift){
   document.getElementById('wheel-inner-group').innerHTML = innerHTML;
 }
 
+let lastAcceptedShift = 1;
+let shiftCooldownUntil = 0;
+
 function updateDecoderOutput(){
-  const shiftRaw = parseInt(document.getElementById('decoder-shift').value, 10);
-  const shift = ((isNaN(shiftRaw) ? 0 : shiftRaw) % 26 + 26) % 26;
+  const shift = ((lastAcceptedShift % 26) + 26) % 26;
   const cipherText = document.getElementById('decoder-input').value;
   const plain = caesarEncrypt(cipherText, (26 - shift) % 26);
   document.getElementById('decoder-output').textContent = cipherText.trim() ? plain : '—';
   renderWheel(shift);
+}
+
+function onDecoderShiftChange(){
+  const el = document.getElementById('decoder-shift');
+  const now = Date.now();
+  if(now < shiftCooldownUntil){
+    el.value = lastAcceptedShift; // still cooling down — ignore this change
+    return;
+  }
+  const raw = parseInt(el.value, 10);
+  lastAcceptedShift = isNaN(raw) ? 0 : raw;
+  updateDecoderOutput();
+  shiftCooldownUntil = now + 2000;
+  el.disabled = true;
+  setTimeout(()=>{ el.disabled = false; }, 2000);
+}
+
+function onDecoderCipherChange(){
+  updateDecoderOutput();
 }
 
 
@@ -631,7 +641,7 @@ function teamName(g, id){ return (g.teams && g.teams[id] && g.teams[id].name) ||
 function teamColour(g, id){ return g.teams && g.teams[id] && g.teams[id].colour; }
 
 function renderTeacher(g){
-  document.getElementById('phase-pill').textContent = g.phase.toUpperCase();
+  document.getElementById('phase-pill').textContent = g.practice && g.phase!=='lobby' && g.phase!=='ended' ? 'PRACTICE' : g.phase.toUpperCase();
   document.getElementById('phase-pill').classList.toggle('live', g.phase!=='lobby' && g.phase!=='ended');
   document.getElementById('btn-end-game-top').disabled = (g.phase==='lobby' || g.phase==='ended');
 
@@ -648,6 +658,7 @@ function renderTeacher(g){
   }
   const allHaveColour = ids.length>0 && ids.every(id=>g.teams[id].colour);
   document.getElementById('btn-reshuffle').disabled = ids.length<2 || g.phase!=='lobby';
+  document.getElementById('btn-start-practice').disabled = ids.length<2 || !allHaveColour || g.phase!=='lobby';
   document.getElementById('btn-start-game').disabled = ids.length<2 || !allHaveColour || g.phase!=='lobby';
   document.getElementById('btn-start-game').textContent = !allHaveColour && ids.length>=2 ? 'Start game (waiting on colour assignment)' : 'Start game';
 
@@ -670,9 +681,18 @@ function renderTeacher(g){
   }
 
   if(g.phase==='roundend'){
-    document.getElementById('rend-num').textContent = g.round;
-    document.getElementById('rend-next').textContent = g.round+1;
-    document.getElementById('btn-next-round').classList.toggle('hidden', g.round>=g.maxRounds);
+    if(g.practice){
+      document.getElementById('rend-heading').textContent = 'Practice round complete';
+      document.getElementById('rend-caption').textContent = 'That was just a demo — nothing here counted. Ready to start the real thing?';
+      document.getElementById('btn-next-round').classList.add('hidden');
+      document.getElementById('btn-end-practice').classList.remove('hidden');
+    } else {
+      document.getElementById('rend-heading').textContent = `Round ${g.round} complete`;
+      document.getElementById('rend-caption').textContent = 'All orders for this round have been resolved.';
+      document.getElementById('rend-next').textContent = g.round+1;
+      document.getElementById('btn-next-round').classList.toggle('hidden', g.round>=g.maxRounds);
+      document.getElementById('btn-end-practice').classList.add('hidden');
+    }
   }
 
   renderGridInto('teacher-grid', g.grid);
@@ -685,8 +705,6 @@ function renderRevealPanel(g){
   const cr = g.currentReveal;
   document.getElementById('t-reveal-index').textContent = g.revealIdx+1;
   document.getElementById('t-reveal-total').textContent = g.revealOrder.length;
-  const colour = teamColour(g, cr.team);
-  document.getElementById('t-reveal-team').innerHTML = `<span class="team-swatch t-${colour}"></span>${escapeHtml(teamName(g,cr.team))} <span class="muted">(${CODE_OF[colour]})</span>`;
   document.getElementById('t-cipher-display').textContent = cr.ciphertext;
 
   const attempts = g.crackAttempts || {};
@@ -729,16 +747,36 @@ function reshuffleColours(){
 function teacherStartGame(){
   gameRef.once('value').then(snap=>{
     const g = snap.val();
-    const teams = g.teams||{};
-    const grid = {};
-    Object.keys(BASES).forEach(sq=>{
-      const c = BASES[sq];
-      const ownerId = Object.keys(teams).find(id=>teams[id].colour===c);
-      if(ownerId) grid[sq]=c;
-    });
+    const grid = baseGridFor(g.teams||{});
     gameRef.update({
-      phase:'submitting', round:1, grid, submissions:{}, revealOrder:[], revealIdx:-1,
+      phase:'submitting', round:1, practice:false, grid, submissions:{}, revealOrder:[], revealIdx:-1,
       currentReveal:null, crackAttempts:{}, log:[logEntry(g,'Game started. Round 1 begins.')]
+    });
+  });
+}
+
+function teacherStartPractice(){
+  gameRef.once('value').then(snap=>{
+    const g = snap.val();
+    const grid = baseGridFor(g.teams||{});
+    gameRef.update({
+      phase:'submitting', round:1, practice:true, grid, submissions:{}, revealOrder:[], revealIdx:-1,
+      currentReveal:null, crackAttempts:{},
+      log:[logEntry(g,'Practice round started — scores and territory won\'t count toward the real game.')]
+    });
+  });
+}
+
+function teacherEndPractice(){
+  gameRef.once('value').then(snap=>{
+    const g = snap.val();
+    const teams = {...g.teams};
+    Object.keys(teams).forEach(id=>{ teams[id] = {...teams[id], score:0}; });
+    const grid = baseGridFor(teams);
+    gameRef.update({
+      phase:'submitting', round:1, practice:false, teams, grid, submissions:{}, revealOrder:[], revealIdx:-1,
+      currentReveal:null, crackAttempts:{},
+      log:[logEntry(g,'Practice round finished. The real game starts now — scores and territory reset.')]
     });
   });
 }
@@ -760,7 +798,7 @@ function startReveal(teamId){
     gameRef.update({
       currentReveal:{ team:teamId, ciphertext:sub.ciphertext, timerEnd, timerEnded:false },
       crackAttempts:{},
-      log:[...(g.log||[]), logEntry(g, `Intercepted a transmission from ${teamName(g,teamId)}.`)]
+      log:[...(g.log||[]), logEntry(g, `Intercept ${g.revealIdx+1} of ${g.revealOrder.length} incoming — crack window open.`)]
     });
   });
 }
@@ -911,7 +949,7 @@ function renderGridInto(elId, grid, editable){
     return `<div class="cell ${owner?'owned-'+owner:''}" ${editable?`onclick="cycleOwner('${sq}')"`:''} data-sq="${sq}">
       <span class="coord">${sq}</span>
       ${owner ? `<span class="team-swatch t-${owner}"></span>` : ''}
-      ${base ? `<span class="base-mark">${cap(base)} base</span>` : ''}
+      ${base ? `<span class="base-mark">${CODE_OF[base]} base</span>` : ''}
     </div>`;
   }).join('');
 }
@@ -1046,6 +1084,27 @@ function saveSetup(){
   });
 }
 
+function resetSetup(){
+  const statusEl = document.getElementById('setup-status');
+  gameRef.once('value').then(snap=>{
+    const g = snap.val();
+    if(g.phase !== 'lobby'){
+      statusEl.textContent = 'The game has already started — nothing left to reset.';
+      return;
+    }
+    if(!confirm('Reset your codename and clear your cipher shift? This undoes what you\'ve entered so far.')) return;
+    const teams = g.teams || {};
+    const existingNames = Object.keys(teams).filter(tid=>tid!==myTeamId).map(tid=>(teams[tid].name||'').toLowerCase());
+    const newName = generateTeamName(existingNames);
+    gameRef.update({
+      [`teams/${myTeamId}/name`]: newName,
+      [`teams/${myTeamId}/shift`]: null
+    }).then(()=>{
+      statusEl.textContent = 'Reset — new codename assigned, shift cleared. Set a new shift and click Save.';
+    });
+  });
+}
+
 function leaveTeam(){
   localStorage.removeItem('eaa_team_id');
   localStorage.removeItem('eaa_session');
@@ -1083,8 +1142,9 @@ function renderTeamView(g, id){
 
   const shiftInput = document.getElementById('shift-input');
   const gameStarted = g.phase !== 'lobby';
-  if(t.shift!=null && document.activeElement!==shiftInput) shiftInput.value = t.shift;
+  if(document.activeElement!==shiftInput) shiftInput.value = (t.shift!=null ? t.shift : '');
   shiftInput.disabled = gameStarted;
+  document.getElementById('btn-reset-setup').disabled = gameStarted;
   document.getElementById('setup-status').textContent = gameStarted
     ? (t.shift!=null ? 'Codename can still be changed any time. Cipher shift is locked in for this game.' : 'Codename can still be changed, but no shift was set before the game started!')
     : (t.shift!=null ? 'All set — you can still change either field until the game starts.' : 'Set your cipher shift and click Save before the game starts.');
@@ -1110,8 +1170,7 @@ function renderTeamView(g, id){
   incomingIdle.classList.toggle('hidden', !!cr);
   incomingActive.classList.toggle('hidden', !cr);
   if(cr){
-    const colour = g.teams[cr.team].colour;
-    document.getElementById('tc-team-name').innerHTML = `<span class="team-swatch t-${colour}"></span>${escapeHtml(g.teams[cr.team].name)}`;
+    document.getElementById('tc-index').textContent = `${g.revealIdx+1} of ${g.revealOrder.length}`;
     document.getElementById('tc-cipher').textContent = cr.ciphertext;
     const isOwn = cr.team===id;
     document.getElementById('tc-own-message').classList.toggle('hidden', !isOwn);
