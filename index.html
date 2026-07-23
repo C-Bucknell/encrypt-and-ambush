@@ -733,10 +733,10 @@
     <div id="screen-teacher" class="hidden">
         <div class="topbar">
             <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ CONSOLE</span></div>
-            <div style="display:flex; gap:10px; align-items:center;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <span id="phase-pill" class="status-pill">LOBBY</span>
                 <button class="danger small" id="btn-end-game-top" onclick="teacherEndGame()" disabled>End game</button>
-                <button class="ghost small" onclick="confirmReset()">Reset game</button>
+                <button class="ghost small" onclick="confirmReset()">Reset and Start New Game</button>
             </div>
         </div>
         <div class="wrap grid2">
@@ -1761,7 +1761,7 @@
         }
         /** Wipes the entire game back to a fresh lobby state after teacher confirmation — clears all teams, scores and colours. */
         function confirmReset() {
-            if (confirm('Reset the entire game? All teams, names, colours and scores will be cleared.')) {
+            if (confirm('Reset and start a new game? This will remove all teams, clear the scoreboard, clear the field log, and reset the map — and any student currently on their team screen will be sent back to the join screen. This cannot be undone.')) {
                 clearInterval(revealTimerHandle); revealTimerHandle = null;
                 teacherResolvePanelOpen = false;
                 gameRef.set(freshGameState());
