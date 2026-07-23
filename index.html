@@ -735,6 +735,8 @@
             <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ CONSOLE</span></div>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <span id="phase-pill" class="status-pill">LOBBY</span>
+                <button class="ghost small" onclick="goDecoder()">Decoder wheel</button>
+                <button class="ghost small" onclick="show('screen-landing')">Back to menu</button>
                 <button class="danger small" id="btn-end-game-top" onclick="teacherEndGame()" disabled>End game</button>
                 <button class="ghost small" onclick="confirmReset()">Reset and Start New Game</button>
             </div>
@@ -1359,9 +1361,12 @@
         let teacherResolvePanelOpen = false;
         let pendingGrid = null;
         let resolveBaseGrid = null;
+        let teacherListenerAttached = false;
 
-        /** Subscribes the teacher console to the live game state, initialising a fresh game if none exists yet, and re-rendering on every change. */
+        /** Subscribes the teacher console to the live game state, initialising a fresh game if none exists yet, and re-rendering on every change. Safe to call repeatedly (e.g. navigating away and back) — only attaches the listener once. */
         function initTeacherView() {
+            if (teacherListenerAttached) return;
+            teacherListenerAttached = true;
             gameRef.on('value', snap => {
                 let g = snap.val();
                 if (!g) { g = freshGameState(); gameRef.set(g); return; }
@@ -1879,9 +1884,14 @@
         }
 
         /** Subscribes this device to live game updates as the given team, redirecting back to landing if the session/team becomes invalid (e.g. after a reset). */
+        let teamListenerAttached = false;
+
+        /** Subscribes this device to live game updates as the given team, redirecting back to landing if the session/team becomes invalid (e.g. after a reset). Safe to call repeatedly for the same team — only attaches the listener once. */
         function enterTeamScreen(id) {
-            myTeamId = id;
             show('screen-team');
+            if (teamListenerAttached && myTeamId === id) return;
+            myTeamId = id;
+            teamListenerAttached = true;
             gameRef.on('value', snap => {
                 const g = snap.val();
                 if (!g) return;
