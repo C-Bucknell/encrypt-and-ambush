@@ -638,6 +638,62 @@
                 color: var(--amber);
                 width: 28px;
             }
+
+        .flow-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: center;
+            margin: 16px 0;
+        }
+
+        .flow-step {
+            width: 128px;
+            text-align: center;
+        }
+
+        .flow-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--amber);
+            color: #171000;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 8px;
+        }
+
+        .flow-arrow {
+            align-self: center;
+            color: var(--amber-dim);
+            font-size: 20px;
+            padding-top: 4px;
+        }
+
+        .anatomy-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            margin: 12px 0;
+        }
+
+        .anatomy-part {
+            text-align: center;
+            width: 128px;
+        }
+
+            .anatomy-part code {
+                font-size: 15px;
+                padding: 3px 8px;
+                border: 1px solid var(--line);
+                border-radius: 4px;
+                display: inline-block;
+            }
     </style>
 </head>
 <body>
@@ -664,6 +720,11 @@
                 <span class="role-tag">Helper tool</span>
                 <h3>Decoder wheel</h3>
                 <p>Caesar-cipher wheel for practising, or for a spare pair of hands to help crack a message.</p>
+            </div>
+            <div class="role-card" onclick="goHowTo()">
+                <span class="role-tag">Read first</span>
+                <h3>How to play</h3>
+                <p>Step-by-step instructions with diagrams — squares, commands, the round cycle, and common mistakes to avoid.</p>
             </div>
         </div>
     </div>
@@ -785,6 +846,7 @@
             <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH</div>
             <div style="display:flex; align-items:center; gap:10px;">
                 <span id="team-badge" class="status-pill"></span>
+                <button class="ghost small" onclick="goHowTo()">How to play</button>
                 <button class="ghost small" onclick="leaveTeam()">Leave</button>
             </div>
         </div>
@@ -924,6 +986,160 @@
         </div>
     </div>
 
+    <!-- ================= HOW TO PLAY (standalone) ================= -->
+    <div id="screen-howto" class="hidden">
+        <div class="topbar">
+            <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ HOW TO PLAY</span></div>
+            <button class="ghost small" onclick="show('screen-landing')">‹ Back to menu</button>
+        </div>
+        <div class="wrap" style="max-width:760px;">
+
+            <div class="panel">
+                <h3>How to play — step by step</h3>
+                <p class="hint" style="margin-top:0;">Goal: finish with the most points. <strong>Points</strong> = every square you
+                    control on the map, <strong>+1</strong> for every enemy order you successfully crack.</p>
+            </div>
+
+            <div class="panel">
+                <h3>Step 1 — Join &amp; set up</h3>
+                <p class="hint">Click <strong>Join a team</strong> on the main menu — you'll get a random codename and colour
+                    automatically, no choice needed. In the <strong>Setup</strong> panel, enter a Caesar cipher shift (any
+                    number 1–25) and click <strong>Save</strong>. Do this <em>before</em> the teacher starts the game — your
+                    shift locks in the moment it does and can't be changed afterwards.</p>
+            </div>
+
+            <div class="panel">
+                <h3>Step 2 — Learn the board</h3>
+                <p class="hint">Squares are named by column (A–F) then row (1–5) — A1 is top-left, F5 is bottom-right. When you
+                    <code class="cmd-move">MOVE</code>, you can only move to a square directly next to yours:</p>
+                <svg viewBox="0 0 300 300" style="max-width:260px; width:100%; margin:16px auto; display:block;">
+                    <rect x="0" y="0" width="92" height="92" rx="6" fill="rgba(192,69,59,.12)" stroke="#2a3034" stroke-width="1" />
+                    <rect x="208" y="0" width="92" height="92" rx="6" fill="rgba(192,69,59,.12)" stroke="#2a3034" stroke-width="1" />
+                    <rect x="0" y="208" width="92" height="92" rx="6" fill="rgba(192,69,59,.12)" stroke="#2a3034" stroke-width="1" />
+                    <rect x="208" y="208" width="92" height="92" rx="6" fill="rgba(192,69,59,.12)" stroke="#2a3034" stroke-width="1" />
+                    <text x="46" y="46" text-anchor="middle" dominant-baseline="central" fill="#c0453b" font-size="22" font-family="'Space Grotesk',sans-serif">✕</text>
+                    <text x="254" y="46" text-anchor="middle" dominant-baseline="central" fill="#c0453b" font-size="22" font-family="'Space Grotesk',sans-serif">✕</text>
+                    <text x="46" y="254" text-anchor="middle" dominant-baseline="central" fill="#c0453b" font-size="22" font-family="'Space Grotesk',sans-serif">✕</text>
+                    <text x="254" y="254" text-anchor="middle" dominant-baseline="central" fill="#c0453b" font-size="22" font-family="'Space Grotesk',sans-serif">✕</text>
+
+                    <rect x="104" y="0" width="92" height="92" rx="6" fill="rgba(63,143,95,.28)" stroke="#3f8f5f" stroke-width="1.5" />
+                    <rect x="0" y="104" width="92" height="92" rx="6" fill="rgba(63,143,95,.28)" stroke="#3f8f5f" stroke-width="1.5" />
+                    <rect x="208" y="104" width="92" height="92" rx="6" fill="rgba(63,143,95,.28)" stroke="#3f8f5f" stroke-width="1.5" />
+                    <rect x="104" y="208" width="92" height="92" rx="6" fill="rgba(63,143,95,.28)" stroke="#3f8f5f" stroke-width="1.5" />
+                    <text x="150" y="46" text-anchor="middle" dominant-baseline="central" fill="#3f8f5f" font-size="15" font-weight="700" font-family="'Space Grotesk',sans-serif">OK</text>
+                    <text x="46" y="150" text-anchor="middle" dominant-baseline="central" fill="#3f8f5f" font-size="15" font-weight="700" font-family="'Space Grotesk',sans-serif">OK</text>
+                    <text x="254" y="150" text-anchor="middle" dominant-baseline="central" fill="#3f8f5f" font-size="15" font-weight="700" font-family="'Space Grotesk',sans-serif">OK</text>
+                    <text x="150" y="254" text-anchor="middle" dominant-baseline="central" fill="#3f8f5f" font-size="15" font-weight="700" font-family="'Space Grotesk',sans-serif">OK</text>
+
+                    <rect x="104" y="104" width="92" height="92" rx="6" fill="rgba(232,184,75,.28)" stroke="#e8b84b" stroke-width="1.5" />
+                    <text x="150" y="150" text-anchor="middle" dominant-baseline="central" fill="#e8b84b" font-size="15" font-weight="700" font-family="'Space Grotesk',sans-serif">YOU</text>
+                </svg>
+                <p class="hint" style="margin-top:0;">Only <strong>up / down / left / right</strong> count as adjacent — the
+                    diagonal squares (marked ✕) don't count, even though they look close on the map.</p>
+            </div>
+
+            <div class="panel">
+                <h3>Step 3 — Write your order</h3>
+                <p class="hint">Each round, every team submits exactly <strong>one</strong> order. There are two kinds:</p>
+
+                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">MOVE — claim a square</p>
+                <div class="anatomy-row">
+                    <div class="anatomy-part">
+                        <code class="cmd-move">MOVE</code>
+                        <p class="hint">the command</p>
+                    </div>
+                    <div class="anatomy-part">
+                        <code>A1</code>
+                        <p class="hint">FROM — a square you already control</p>
+                    </div>
+                    <div class="anatomy-part">
+                        <code>A2</code>
+                        <p class="hint">TO — adjacent, and not enemy-held</p>
+                    </div>
+                </div>
+
+                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">AMBUSH — strike a rival agency</p>
+                <div class="anatomy-row">
+                    <div class="anatomy-part">
+                        <code class="cmd-ambush">AMBUSH</code>
+                        <p class="hint">the command</p>
+                    </div>
+                    <div class="anatomy-part">
+                        <code>RUBY</code>
+                        <p class="hint">the target's 4-letter codename — not their colour word</p>
+                    </div>
+                </div>
+                <p class="hint">Codenames (like RUBY, AQUA, LIME) are always 4 letters. Check the legend under your tactical
+                    map any time you need a reminder of which codename belongs to which team.</p>
+            </div>
+
+            <div class="panel">
+                <h3>Step 4 — Submit, then wait</h3>
+                <p class="hint">Type your order, check the encrypted version that appears next to it, then click
+                    <strong>Submit encrypted order</strong>. There's no undo after that — double-check your squares and
+                    codename spelling before you submit.</p>
+            </div>
+
+            <div class="panel">
+                <h3>Step 5 — The reveal &amp; crack window</h3>
+                <p class="hint">Once everyone has submitted, the round moves through these stages:</p>
+                <div class="flow-row">
+                    <div class="flow-step">
+                        <div class="flow-num">1</div>
+                        <p class="hint">Everyone submits one encrypted order</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-num">2</div>
+                        <p class="hint">Console reveals one order at a time, in random order</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-num">3</div>
+                        <p class="hint">Everyone else has 30 seconds to crack it</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-num">4</div>
+                        <p class="hint">Teacher resolves the outcome</p>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="flow-num">5</div>
+                        <p class="hint">Repeat until the round ends</p>
+                    </div>
+                </div>
+                <p class="hint">Watch the <strong>Incoming message</strong> panel on your screen — when it lights up and it
+                    isn't your own order, type your best guess of the plain text. Guess right and you score a point; guess
+                    wrong and nothing happens, no penalty.</p>
+            </div>
+
+            <div class="panel">
+                <h3>Step 6 — Scoring &amp; next round</h3>
+                <p class="hint" style="margin-top:0;">Your score = every square you control + 1 point for every message
+                    you've successfully cracked. This repeats for several rounds, then the game ends and the highest score
+                    wins.</p>
+            </div>
+
+            <div class="panel" style="border-color:var(--red);">
+                <h3 style="color:var(--red);">Common mistakes to avoid</h3>
+                <ul style="margin:0; padding-left:18px; color:#e6e2d6; font-size:13px; line-height:1.9;">
+                    <li><code class="cmd-move">MOVE</code> must start from a square <strong>you already control</strong> —
+                        not just any square.</li>
+                    <li>Adjacent means <strong>up/down/left/right only</strong> — never diagonal, even if it looks close.</li>
+                    <li><code class="cmd-ambush">AMBUSH</code> targets the enemy's <strong>codename</strong> (e.g. RUBY), not
+                        their colour word (e.g. "Red").</li>
+                    <li>Set your cipher shift <strong>before</strong> the game starts — it locks in and can't be changed once
+                        it does.</li>
+                    <li>One order per round, with no undo — check squares and spelling before you hit submit.</li>
+                    <li>During the crack window, you're guessing <strong>someone else's</strong> message — you can't crack
+                        your own.</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
 
     <!-- ================= FIREBASE ================= -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -1060,7 +1276,7 @@
         }
         /** Single-page-app style screen switcher: shows only the screen with the given element id, hiding all the others. */
         function show(id) {
-            ['screen-landing', 'screen-teacher', 'screen-team-join', 'screen-team', 'screen-decoder'].forEach(s => {
+            ['screen-landing', 'screen-teacher', 'screen-team-join', 'screen-team', 'screen-decoder', 'screen-howto'].forEach(s => {
                 document.getElementById(s).classList.toggle('hidden', s !== id);
             });
         }
@@ -1072,6 +1288,11 @@
         function goDecoder() {
             show('screen-decoder');
             updateDecoderOutput();
+        }
+
+        /** Opens the standalone How to Play screen — pure static instructions, no game/Firebase state involved, safe to open any time without losing a team's session. */
+        function goHowTo() {
+            show('screen-howto');
         }
 
         /** Converts a wheel angle (degrees, 0 = top, clockwise) into an (x, y) point on a circle of radius `r` centred at (cx, cy). Used to place each letter around the decoder wheel. */
