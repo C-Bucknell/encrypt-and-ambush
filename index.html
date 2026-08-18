@@ -743,6 +743,14 @@
         </div>
         <div class="wrap grid2">
             <div>
+                <div class="panel">
+                    <h3>Game settings</h3>
+                    <label>Number of rounds</label>
+                    <input type="number" id="teacher-max-rounds" min="1" max="20" value="4" onchange="saveMaxRounds()">
+                    <p class="hint" id="teacher-rounds-status">Current round limit: 4</p>
+                    <p class="hint">Changing this updates the game end condition immediately — the final round is whatever the current total is set to.</p>
+                </div>
+
                 <div class="panel" id="teacher-lobby-panel">
                     <h3>Agencies checked in</h3>
                     <div id="teacher-team-list" class="muted">No teams have joined yet.</div>
@@ -1391,6 +1399,17 @@
             document.getElementById('phase-pill').classList.toggle('live', g.phase !== 'lobby' && g.phase !== 'ended');
             document.getElementById('btn-end-game-top').disabled = (g.phase === 'lobby' || g.phase === 'ended');
 
+            const maxRoundInput = document.getElementById('teacher-max-rounds');
+            const maxRoundStatus = document.getElementById('teacher-rounds-status');
+            if (maxRoundInput) {
+                const safeMax = Number.isInteger(g.maxRounds) ? g.maxRounds : 4;
+                maxRoundInput.value = safeMax;
+            }
+            if (maxRoundStatus) {
+                const round = Number.isInteger(g.round) ? g.round : 1;
+                maxRoundStatus.textContent = `Current round limit: ${g.maxRounds || 4} • round ${round}`;
+            }
+
             const ids = Object.keys(g.teams || {});
             const listEl = document.getElementById('teacher-team-list');
             if (ids.length === 0) {
@@ -1752,12 +1771,41 @@
         }
 
         /** Advances the game to the next round, clearing submissions/reveal state ready for teams to submit new orders. */
+        function saveMaxRounds() {
+            const input = document.getElementById('teacher-max-rounds');
+            if (!input) return;
+            const parsed = parseInt(input.value, 10);
+            if (!Number.isInteger(parsed) || parsed < 1 || parsed > 20) {
+                gameRef.once('value').then(snap => {
+                    const g = snap.val();
+                    const safe = Number.isInteger(g && g.maxRounds) ? g.maxRounds : 4;
+                    input.value = safe;
+                    const status = document.getElementById('teacher-rounds-status');
+                    if (status) status.textContent = `Current round limit: ${safe} • round ${(g && g.round) || 1}`;
+                });
+                return;
+            }
+            gameRef.once('value').then(snap => {
+                const g = snap.val();
+                const updates = { maxRounds: parsed };
+                if (g && Number.isInteger(g.round) && g.round > parsed) {
+                    updates.round = parsed;
+                }
+                gameRef.update(updates).then(() => {
+                    const status = document.getElementById('teacher-rounds-status');
+                    if (status) status.textContent = `Current round limit: ${parsed} • round ${Math.min(g && Number.isInteger(g.round) ? g.round : 1, parsed)}`;
+                });
+            });
+        }
+
+        /** Advances the game to the next round, clearing submissions/reveal state ready for teams to submit new orders. */
         function teacherNextRound() {
             gameRef.once('value').then(snap => {
                 const g = snap.val();
+                const nextRound = Math.min(g.round + 1, g.maxRounds || 4);
                 gameRef.update({
-                    phase: 'submitting', round: g.round + 1, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, log: [...(g.log || []), logEntry(g, `Round ${g.round + 1} begins.`)]
+                    phase: 'submitting', round: nextRound, submissions: {}, revealOrder: [], revealIdx: -1,
+                    currentReveal: null, crackAttempts: {}, log: [...(g.log || []), logEntry(g, `Round ${nextRound} begins.`)]
                 });
             });
         }
