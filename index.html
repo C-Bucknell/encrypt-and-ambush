@@ -1217,6 +1217,11 @@
             return 'Agency ' + Math.floor(1000 + Math.random() * 9000);
         }
 
+        /** Returns a random Caesar shift in the valid 1–25 range for use when a team hasn't chosen one yet. */
+        function generateRandomShift() {
+            return 1 + Math.floor(Math.random() * 25);
+        }
+
         /** Caesar-cipher encrypt: shifts each A-Z letter by `shift` positions (wrapping), leaving other characters untouched. Passing `26 - shift` decrypts. */
         function caesarEncrypt(text, shift) {
             return text.toUpperCase().split('').map(ch => {
@@ -1801,7 +1806,7 @@
                 if (available.length === 0) return; // abort — shouldn't happen, but safe
                 const existingNames = ids.map(id => (teams[id].name || '').toLowerCase());
                 const name = generateTeamName(existingNames);
-                teams[newId] = { name, colour: available[0], shift: null, score: 0 };
+                teams[newId] = { name, colour: available[0], shift: generateRandomShift(), score: 0 };
                 g.teams = teams;
                 return g;
             }, (error, committed, snapshot) => {
@@ -1826,7 +1831,8 @@
             const shiftInput = document.getElementById('shift-input');
             const statusEl = document.getElementById('setup-status');
             const name = nameInput.value.trim().replace(/\s+/g, ' ');
-            const shiftVal = parseInt(shiftInput.value, 10);
+            const rawShift = shiftInput.value.trim();
+            const shiftVal = rawShift === '' ? generateRandomShift() : parseInt(rawShift, 10);
 
             if (!name) { statusEl.textContent = 'Enter a codename first.'; return; }
             if (name.length > 24) { statusEl.textContent = 'Keep the codename to 24 characters or fewer.'; return; }
@@ -1866,12 +1872,13 @@
                 const teams = g.teams || {};
                 const existingNames = Object.keys(teams).filter(tid => tid !== myTeamId).map(tid => (teams[tid].name || '').toLowerCase());
                 const newName = generateTeamName(existingNames);
+                const newShift = generateRandomShift();
                 gameRef.update({
                     [`teams/${myTeamId}/name`]: newName,
-                    [`teams/${myTeamId}/shift`]: null,
+                    [`teams/${myTeamId}/shift`]: newShift,
                     [`teams/${myTeamId}/setupSaved`]: false
                 }).then(() => {
-                    statusEl.textContent = 'Reset — new codename assigned, shift cleared. Set a new shift and click Save.';
+                    statusEl.textContent = 'Reset — new codename assigned, random shift generated. Adjust if you want, then click Save.';
                 });
             });
         }
