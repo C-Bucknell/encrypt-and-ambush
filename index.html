@@ -764,6 +764,7 @@
                 <div class="panel hidden" id="teacher-submit-panel">
                     <h3>Round <span id="t-round-num">1</span> — Orders being encrypted</h3>
                     <div id="t-submit-status" class="muted">Waiting on teams to submit...</div>
+                    <div id="t-pending-submissions" class="muted" style="margin-top:8px; line-height:1.8;"></div>
                     <div class="divider"></div>
                     <button class="block" id="btn-begin-reveal" onclick="beginRevealPhase()" disabled>Begin intercepts</button>
                 </div>
@@ -1437,7 +1438,10 @@
             if (g.phase === 'submitting') {
                 document.getElementById('t-round-num').textContent = g.round;
                 const subCount = Object.keys(g.submissions || {}).length;
+                const pending = ids.filter(id => !g.submissions || !g.submissions[id]);
                 document.getElementById('t-submit-status').textContent = `${subCount} / ${ids.length} agencies have submitted.`;
+                const pendingList = pending.length ? pending.map(id => `<span class="team-swatch t-${g.teams[id].colour}"></span>${escapeHtml(g.teams[id].name)}`).join(' ') : 'All teams are ready.';
+                document.getElementById('t-pending-submissions').innerHTML = pending.length ? `Still waiting: ${pendingList}` : 'Everyone has submitted this round.';
                 document.getElementById('btn-begin-reveal').disabled = subCount < ids.length || subCount === 0;
             }
 
@@ -1474,16 +1478,32 @@
             document.getElementById('t-cipher-display').textContent = cr.ciphertext;
 
             const attempts = g.crackAttempts || {};
+            const winnerId = chooseCrackingWinner(attempts);
             const rows = Object.keys(attempts).map(id => {
                 const a = attempts[id];
-                return `<div class="score-row"><span><span class="team-swatch t-${teamColour(g, id)}"></span>${escapeHtml(teamName(g, id))}</span><span class="${a.correct ? 'txt-green' : 'txt-red'}">${a.correct ? 'CRACKED' : 'incorrect'}</span></div>`;
+                const isWinner = id === winnerId;
+                return `<div class="score-row"><span><span class="team-swatch t-${teamColour(g, id)}"></span>${escapeHtml(teamName(g, id))}</span><span class="${a.correct ? 'txt-green' : 'txt-red'}">${a.correct ? (isWinner ? 'FIRST CRACK' : 'CRACKED') : 'incorrect'}</span></div>`;
             }).join('');
             document.getElementById('t-crack-attempts').innerHTML = rows || '<p class="muted">No decryption attempts yet.</p>';
 
             document.getElementById('btn-resolve').disabled = !cr.timerEnded;
-            document.getElementById('t-timer-caption').textContent = cr.timerEnded ? 'Clock stopped — ready to resolve.' : 'Other agencies are attempting to crack this.';
+            document.getElementById('t-timer-caption').textContent = winnerId
+                ? `${teamName(g, winnerId)} was the first to crack it.`
+                : (cr.timerEnded ? 'Clock stopped — ready to resolve.' : 'Other agencies are attempting to crack this.');
 
             if (!revealTimerHandle) revealTimerHandle = setInterval(() => tickTimer('teacher'), 250);
+        }
+
+        /** Chooses the first team to submit a correct crack by timestamp, rather than relying on object insertion order. */
+        function chooseCrackingWinner(attempts) {
+            const entries = Object.entries(attempts || {}).filter(([, attempt]) => attempt && attempt.correct);
+            if (entries.length === 0) return null;
+            entries.sort((a, b) => {
+                const diff = (a[1].at ?? Number.MAX_SAFE_INTEGER) - (b[1].at ?? Number.MAX_SAFE_INTEGER);
+                if (diff !== 0) return diff;
+                return a[0].localeCompare(b[0]);
+            });
+            return entries[0][0];
         }
 
         /** Interval callback that counts down the current reveal's timer display (for either the 'teacher' or 'team' view) and flags it as ended once it reaches zero. */
@@ -1589,7 +1609,7 @@
                 const cr = g.currentReveal;
                 const sub = g.submissions[cr.team];
                 const attempts = g.crackAttempts || {};
-                const crackedBy = Object.keys(attempts).find(id => attempts[id].correct);
+                const crackedBy = chooseCrackingWinner(attempts);
                 const outcome = crackedBy ? 'block' : 'stand';
                 const ambushHit = sub.plaintext.trim().toUpperCase().match(AMBUSH_RE);
                 let targetNote = '';
@@ -1620,7 +1640,7 @@
                 const cr = g.currentReveal;
                 const sub = g.submissions[cr.team];
                 const outcome = document.getElementById('resolve-outcome').value;
-                const crackedBy = document.getElementById('resolve-outcome').dataset.crackedBy;
+                const crackedBy = document.getElementById('resolve-outcome').dataset.crackedBy || chooseCrackingWinner(g.crackAttempts || {});
                 const result = suggestGridForOutcome(resolveBaseGrid, g, cr, sub, outcome);
                 pendingGrid = result.grid;
                 renderResolveNote(result, outcome, crackedBy);
