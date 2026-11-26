@@ -34,17 +34,17 @@ Computing or similar. Works well as a single 50-minute lesson.
 2. Each round, every team submits **one** encrypted order before the entry timer
    runs out (teacher sets it, 45 seconds by default):
    - `MOVE <from> <to>` — claim an adjacent empty square
+   - `STEAL <from> <to>` — take a rival's adjacent square (not a base)
    - `AMBUSH <codename>` — capture that agency's base, unless they defend it
    - `DEFEND` — take your base back and protect it for the rest of the round
      (sent as `DEFEND <your codename>`, the same length as an AMBUSH)
 3. The console reveals one encrypted order at a time. Everyone else has
    **30 seconds** to crack it.
-4. The first team to crack it earns +1 and chooses, within 15 seconds:
-   **BLOCK** (cancel the order), **STEAL** (take 1 point from the sender; the order
-   still goes ahead) or, for an ambush, **CHANGE** (redirect it at a new target and
-   capture that base themselves). Uncracked orders stand.
+4. The first team to crack it earns +1 and the order is **BLOCKED**. If it was an
+   ambush, the cracker can instead choose **CHANGE** within 15 seconds: capture any
+   base they don't already hold (works with any number of teams). Uncracked orders stand.
 5. Points = 1 per square held + 1 extra per base held (a base is worth 2)
-   + 1 per crack + points stolen − points lost. Usually 4 rounds — highest score wins.
+   + 1 per crack. Usually 4 rounds — highest score wins.
 
 Full rules, with diagrams, are built into the app itself (the **"How to play"**
 option on the landing screen) — nothing needs explaining verbally.
@@ -77,11 +77,11 @@ option on the landing screen) — nothing needs explaining verbally.
   ciphertext length never gives away who's being targeted
 - **Sender identity hidden** during the crack window, on both the console and every
   team's screen — only revealed once the clock stops and it's needed for scoring
-- **Three orders — MOVE, AMBUSH, DEFEND** — with live validation: students get
+- **Four orders — MOVE, STEAL, AMBUSH, DEFEND** — with live validation: students get
   instant feedback if an order doesn't match a real square, a codename in play, or
   the right format, before they can submit
-- **Cracker's choice** — the first team to crack a message picks BLOCK, STEAL or
-  CHANGE with radio buttons (no typing), with a 15-second countdown
+- **Cracker's choice** — the first team to crack a message BLOCKS it, or for an
+  ambush picks BLOCK or CHANGE with radio buttons (no typing), with a 15-second countdown
 - **Order-entry timer** — teacher-set countdown; teams that miss it sit the round out
 - **Bases worth 2 points**, captured by AMBUSH and recovered by DEFEND
 - **A standalone Decoder Wheel** — a visual Caesar-cipher helper any student can
@@ -146,7 +146,7 @@ another teacher — there's no toolchain to set up before you can even open the 
 
 ## Known limitations
 
-- Fixed 6×5 board, up to 6 teams, three order types (`MOVE`, `AMBUSH`, `DEFEND`) —
+- Fixed 6×5 board, up to 6 teams, four order types (`MOVE`, `STEAL`, `AMBUSH`, `DEFEND`) —
   sized for a single-lesson format
 - One live game at a time per Firebase project — don't run two classes
   simultaneously on the same deployed link without resetting between them

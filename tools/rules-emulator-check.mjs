@@ -188,11 +188,12 @@ test('crack attempts: one per team, not on own message, not after the timer', as
 });
 test("only the cracker makes the choice, once, and can't extend the deadline", async () => {
   await env.withSecurityRulesDisabled(c => update(ref(c.database(), 'games/GAME'), {
-    phase: 'revealing', currentReveal: { team: 'stu2', timerEnded: true, choice: { by: 'stu1', deadline: 100, actions: ['block', 'steal'] } } }));
+    phase: 'revealing', currentReveal: { team: 'stu2', timerEnded: true, choice: { by: 'stu1', deadline: 100, actions: ['block', 'change'], targets: ['red'] } } }));
   await assertFails(runTransaction(ref(stu(3), 'games/GAME/currentReveal/choice'), c => ({ ...c, action: 'block' })));
-  await assertFails(runTransaction(ref(stu(1), 'games/GAME/currentReveal/choice'), c => ({ ...c, deadline: 999, action: 'steal' })));
+  await assertFails(runTransaction(ref(stu(1), 'games/GAME/currentReveal/choice'), c => ({ ...c, deadline: 999, action: 'change', target: 'red' })));
   await assertFails(runTransaction(ref(stu(1), 'games/GAME/currentReveal/choice'), c => ({ ...c, action: 'win' })));
-  await assertSucceeds(runTransaction(ref(stu(1), 'games/GAME/currentReveal/choice'), c => ({ ...c, action: 'steal' })));
+  await assertFails(runTransaction(ref(stu(1), 'games/GAME/currentReveal/choice'), c => ({ ...c, action: 'steal' })));
+  await assertSucceeds(runTransaction(ref(stu(1), 'games/GAME/currentReveal/choice'), c => ({ ...c, action: 'change', target: 'red' })));
   await assertFails(runTransaction(ref(stu(1), 'games/GAME/currentReveal/choice'), c => ({ ...c, action: 'block' })));
   // the game owner (console) can still write it, e.g. automatic BLOCK
   await env.withSecurityRulesDisabled(c => update(ref(c.database(), 'games/GAME/currentReveal/choice'), { action: null }));

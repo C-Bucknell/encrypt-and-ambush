@@ -241,29 +241,31 @@ If that works end-to-end, you're ready to run it live.
    back to lobby**. Teams must choose a new cipher shift (the old one is refused,
    because rivals may have cracked it); your team list shows who has re-keyed.
    Then click **Start game** (enabled once at least 2 teams have joined).
-7. Each round: every team types one order (e.g. `MOVE A1 A2`, `AMBUSH RUBY`
-   or just `DEFEND`) before the **entry timer** runs out — set it under
+7. Each round: every team types one order (e.g. `MOVE A1 A2`, `STEAL A1 A2`,
+   `AMBUSH RUBY` or just `DEFEND`) before the **entry timer** runs out — set it under
    **Game settings** (15–180 seconds, default 45). The box validates as they type,
    and **Submit is blocked** until it's valid. **Begin intercepts** unlocks once
    everyone is in, or when the timer runs out (late teams miss that round's order).
 8. The console reveals one team's ciphertext at a time, in random order, with a
    30-second countdown. Every other team sees it as an **Incoming message** and
    types their decryption attempt. Click **Stop clock** once everyone has guessed.
-9. If someone cracked it, the first cracker gets 15 seconds to choose on their own
-   screen: **BLOCK** (order cancelled), **STEAL** (take 1 point from the sender;
-   the order still goes ahead) or, for an AMBUSH, **CHANGE** (redirect it and
-   capture that base themselves). If they don't choose, BLOCK is applied; you can
-   also click **Skip choice (BLOCK)**.
+9. If someone cracked it, the order is **BLOCKED** and the first cracker gets +1.
+   For an AMBUSH they get 15 seconds to choose on their own screen between
+   **BLOCK** and **CHANGE** (capture any base they don't already hold, in a game of
+   any size). If they don't choose, BLOCK is applied; you can also click
+   **Skip choice (BLOCK)**.
 10. Click **Resolve & apply**. The outcome is pre-set from the cracker's choice and
     the map shows the suggested result — `MOVE` must start from a square the team
-    controls and land on an adjacent empty square; `AMBUSH` captures the target's
+    controls and land on an adjacent empty square; `STEAL` takes an adjacent
+    rival square (never a base); `AMBUSH` captures the target's
     base unless it was defended earlier that round; `DEFEND` returns the team's
     base. Every square is still click-to-override.
-11. Repeat for all rounds, or click **End game** in the top bar at any point to
-    stop early and show the final scoreboard.
+11. Repeat for all rounds, or click **End game** in the top bar at any point
+    (even in the lobby) to stop early and show the final scoreboard. Final results
+    offer **Play again (same code)** or **Back to My games**.
 
 Scoring: 1 point per square, 1 extra per base held (so a base is worth 2),
-+1 per crack, plus points stolen and minus points lost.
++1 per crack.
 
 ---
 
@@ -314,9 +316,9 @@ Scoring: 1 point per square, 1 extra per base held (so a base is worth 2),
 
 ## 7. Known limitations (kept deliberately simple)
 
-- Fixed 6×5 grid (30 squares) with six team bases, up to six teams, three
-  order types (`MOVE`, `AMBUSH`, `DEFEND`) plus the cracker's choice
-  (`BLOCK`, `STEAL`, `CHANGE`) — sized for a class of ~25–30 students in teams
+- Fixed 6×5 grid (30 squares) with six team bases, up to six teams, four
+  order types (`MOVE`, `STEAL`, `AMBUSH`, `DEFEND`) plus the cracker's choice
+  (`BLOCK`, or `CHANGE` for an ambush) — sized for a class of ~25–30 students in teams
   of 4.
 - `AMBUSH` has no adjacency requirement by design — any team can strike any
   other team's base regardless of board position. `MOVE` is the only order
