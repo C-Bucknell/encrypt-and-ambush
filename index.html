@@ -730,6 +730,8 @@
             #screen-teacher .bar-actions { flex-wrap: wrap; }
         }
         @media (max-width: 860px) { #screen-teacher .grid2 { grid-template-columns: 1fr; } }
+        /* Part of an order the app fills in for you (shown dashed so students don't type it) */
+        code.auto-part { border: 1px dashed var(--muted) !important; background: transparent !important; color: var(--muted) !important; }
 </style>
 </head>
 <body>
@@ -1309,14 +1311,15 @@
                 <div class="anatomy-row">
                     <div class="anatomy-part">
                         <code class="cmd-ambush">DEFEND</code>
-                        <p class="hint">what you type</p>
+                        <p class="hint">the command — this is all you type</p>
                     </div>
                     <div class="anatomy-part">
-                        <code>DEFEND RUBY</code>
-                        <p class="hint">what's sent — your own codename is added for you</p>
+                        <code class="auto-part">RUBY</code>
+                        <p class="hint">your own codename — added for you, don't type it</p>
                     </div>
                 </div>
-                <p class="hint">If it isn't blocked, you get your base back (even if you lost it in an earlier round) and it
+                <p class="hint">So typing <code class="cmd-ambush">DEFEND</code> sends <code>DEFEND RUBY</code> (with your codename).
+                    If it isn't blocked, you get your base back (even if you lost it in an earlier round) and it
                     can't be ambushed for the rest of the round.</p>
                 <p class="hint">Codenames (like RUBY, AQUA, LIME) are always 4 letters, so AMBUSH and DEFEND orders are the
                     same length once encrypted. Check the legend under your tactical map for which codename belongs to
