@@ -714,12 +714,12 @@
             <div class="role-card" onclick="goRole('teacher')">
                 <span class="role-tag">Console</span>
                 <h3>Run the game</h3>
-                <p>Assign colours, start rounds, reveal intercepts, run the clock, resolve outcomes, end the game whenever you need to.</p>
+                <p>Teachers: sign in with your Microsoft account to create a game for your class and run it from the console.</p>
             </div>
             <div class="role-card" onclick="goRole('team')">
                 <span class="role-tag">Field unit</span>
                 <h3>Join a team</h3>
-                <p>Name your agency, set your cipher shift, encrypt your orders, and try to crack everyone else's.</p>
+                <p>Enter the join code from your teacher, set your cipher shift, encrypt your orders, and crack everyone else's.</p>
             </div>
             <div class="role-card" onclick="goDecoder()">
                 <span class="role-tag">Helper tool</span>
@@ -734,16 +734,148 @@
         </div>
     </div>
 
+    <!-- ================= TEACHER SIGN-IN / ACCESS ================= -->
+    <div id="screen-teacher-signin" class="hidden">
+        <div class="topbar">
+            <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ TEACHERS</span></div>
+            <button class="ghost small" onclick="show('screen-landing')">‹ Back to menu</button>
+        </div>
+        <div class="wrap" style="max-width:520px;">
+            <div class="panel center">
+                <h3>Teacher sign-in</h3>
+                <p class="muted">Sign in with your Microsoft school or personal account. New teachers request access once; you'll be able to run games as soon as the request is approved.</p>
+                <button class="block" style="margin-top:14px;" onclick="teacherSignIn()">Sign in with Microsoft</button>
+                <p class="hint" id="signin-status"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-teacher-request" class="hidden">
+        <div class="topbar">
+            <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ REQUEST ACCESS</span></div>
+            <button class="ghost small" onclick="teacherSignOut()">Sign out</button>
+        </div>
+        <div class="wrap" style="max-width:600px;">
+            <div class="panel">
+                <h3>Request teacher access</h3>
+                <p class="hint" style="margin-top:0;">Signed in as <strong id="req-signed-in"></strong>. Fill this in once. When you submit, an email
+                    with your request opens on your computer for you to send. You'll be able to run games once it's approved.</p>
+                <label>Your name</label>
+                <input type="text" id="req-name" maxlength="80">
+                <label>School</label>
+                <input type="text" id="req-school" maxlength="120" placeholder="e.g. Casey Grammar School">
+                <label>Your role / subjects</label>
+                <input type="text" id="req-role" maxlength="120" placeholder="e.g. Digital Technologies teacher">
+                <label>Year levels you'd use it with</label>
+                <input type="text" id="req-years" maxlength="60" placeholder="e.g. Years 8–10">
+                <label>Roughly how many classes?</label>
+                <input type="number" id="req-classes" min="1" max="50" placeholder="e.g. 3">
+                <label>How and when do you plan to use it?</label>
+                <textarea id="req-use" maxlength="600" placeholder="e.g. cryptography unit in Term 2, one lesson per class"></textarea>
+                <label>How did you hear about Encrypt &amp; Ambush?</label>
+                <input type="text" id="req-heard" maxlength="120">
+                <label>Anything else? (optional)</label>
+                <textarea id="req-notes" maxlength="600"></textarea>
+                <button class="block" style="margin-top:12px;" onclick="submitAccessRequest()">Submit request and open email</button>
+                <p class="hint" id="req-status"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-teacher-pending" class="hidden">
+        <div class="topbar">
+            <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ ACCESS</span></div>
+            <button class="ghost small" onclick="teacherSignOut()">Sign out</button>
+        </div>
+        <div class="wrap" style="max-width:560px;">
+            <div class="panel center">
+                <h3 id="pending-title">Request pending</h3>
+                <p class="muted" id="pending-text"></p>
+                <div id="pending-email-actions">
+                    <p class="hint">If the email didn't open, send your request to <strong id="pending-to"></strong> — copy the details below.</p>
+                    <div class="row" style="margin-top:10px;">
+                        <button class="ghost" onclick="openRequestEmail()">Open email again</button>
+                        <button class="ghost" onclick="copyRequestDetails()">Copy request details</button>
+                    </div>
+                    <p class="hint" id="pending-copy-status"></p>
+                </div>
+                <p class="hint" style="margin-top:14px;">Account ID: <code id="pending-uid"></code></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= TEACHER HOME (MY GAMES) ================= -->
+    <div id="screen-teacher-home" class="hidden">
+        <div class="topbar">
+            <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ MY GAMES</span></div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <span class="muted" id="home-who"></span>
+                <button class="ghost small hidden" id="btn-open-admin" onclick="openAdmin()">Admin</button>
+                <button class="ghost small" onclick="show('screen-landing')">Menu</button>
+                <button class="ghost small" onclick="teacherSignOut()">Sign out</button>
+            </div>
+        </div>
+        <div class="wrap" style="max-width:720px;">
+            <div class="panel">
+                <h3>Start a game for a class</h3>
+                <p class="hint" style="margin-top:0;">Each game gets its own join code, so several classes can play at once. Students can only join while you have the game open.</p>
+                <label>Class or label (optional)</label>
+                <input type="text" id="new-game-label" maxlength="40" placeholder="e.g. 9DT-B Period 3">
+                <button class="block" style="margin-top:10px;" onclick="createGame()">Create game</button>
+                <p class="hint" id="create-status"></p>
+            </div>
+            <div class="panel">
+                <h3>My games</h3>
+                <div id="my-games-list" class="muted">Loading…</div>
+                <p class="hint">Close a game when the lesson ends so students can't keep playing. Delete old games you no longer need.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= ADMIN ================= -->
+    <div id="screen-admin" class="hidden">
+        <div class="topbar">
+            <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ ADMIN</span></div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <span class="status-pill" id="admin-role-pill">ADMIN</span>
+                <button class="ghost small" onclick="openTeacherHome()">‹ My games</button>
+            </div>
+        </div>
+        <div class="wrap" style="max-width:820px;">
+            <div class="panel">
+                <h3>Access requests</h3>
+                <div id="admin-pending" class="muted">Loading…</div>
+            </div>
+            <div class="panel">
+                <h3>Teachers</h3>
+                <div id="admin-teachers" class="muted">Loading…</div>
+            </div>
+            <div class="panel">
+                <h3>Admins and owners</h3>
+                <div id="admin-roles" class="muted">Loading…</div>
+                <p class="hint">Admins can approve teachers and add admins. Owners can also add or remove owners and admins. The primary owner can't be removed.</p>
+            </div>
+            <div class="panel hidden" id="admin-games-panel">
+                <h3>All games</h3>
+                <div id="admin-games" class="muted">Loading…</div>
+            </div>
+        </div>
+    </div>
+
     <!-- ================= TEACHER ================= -->
     <div id="screen-teacher" class="hidden">
         <div class="topbar">
             <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ CONSOLE</span></div>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <span class="status-pill live" id="join-code-pill" title="Students enter this code to join">CODE ----</span>
+                <span id="game-status-pill" class="status-pill">OPEN</span>
                 <span id="phase-pill" class="status-pill">LOBBY</span>
+                <button class="ghost small" id="btn-lock-game" onclick="toggleLock()">Lock joining</button>
+                <button class="ghost small" id="btn-close-game" onclick="toggleClosed()">Close game</button>
                 <button class="ghost small" onclick="goDecoder()">Decoder wheel</button>
-                <button class="ghost small" onclick="show('screen-landing')">Back to menu</button>
+                <button class="ghost small" onclick="openTeacherHome()">My games</button>
                 <button class="danger small" id="btn-end-game-top" onclick="teacherEndGame()" disabled>End game</button>
-                <button class="ghost small" onclick="confirmReset()">Reset and Start New Game</button>
+                <button class="ghost small" onclick="confirmReset()">Reset game</button>
             </div>
         </div>
         <div class="wrap grid2">
@@ -857,10 +989,12 @@
         </div>
         <div class="wrap" style="max-width:480px;">
             <div class="panel center">
-                <h3>Joining the game</h3>
-                <p class="muted" id="join-status-msg">Assigning your agency a codename and colour...</p>
-                <div class="divider"></div>
-                <button class="block hidden" id="btn-join-retry" onclick="autoJoinTeam()">Try again</button>
+                <h3>Join a game</h3>
+                <p class="muted">Enter the join code your teacher shows on the board.</p>
+                <input type="text" id="join-code-input" maxlength="6" placeholder="e.g. KQ7M" style="text-align:center; font-size:22px; letter-spacing:.3em; text-transform:uppercase;" onkeydown="if(event.key==='Enter') joinWithCode()">
+                <button class="block" style="margin-top:10px;" id="btn-join" onclick="joinWithCode()">Join</button>
+                <p class="muted" id="join-status-msg" style="margin-top:10px;"></p>
+                <button class="block hidden" id="btn-join-retry" onclick="joinWithCode()">Try again</button>
             </div>
         </div>
     </div>
@@ -1185,7 +1319,7 @@
                 <ul style="margin:6px 0 0; padding-left:18px; color:#e6e2d6; font-size:13px; line-height:1.9;">
                     <li><strong>BLOCK</strong> — their order is cancelled.</li>
                     <li><strong>STEAL</strong> — take 1 point from them. Their order still goes ahead.</li>
-                    <li><strong>CHANGE</strong> (ambushes only) — pick a new target and capture <em>that</em> base yourself.</li>
+                    <li><strong>CHANGE</strong> (ambushes only, 3+ teams) — pick a new target and capture <em>that</em> base yourself.</li>
                 </ul>
                 <p class="hint">If you don't choose in time, BLOCK is chosen for you. If nobody cracks an order, it stands.</p>
             </div>
@@ -1220,6 +1354,7 @@
     <!-- ================= FIREBASE ================= -->
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
     <script>
         /* =========================================================================
            ENCRYPT & AMBUSH — REPLACE THIS WITH YOUR OWN FIREBASE CONFIG
@@ -1238,11 +1373,12 @@
         // `gameRef` points at the single shared game document in Realtime Database
         // (games/default). Every screen (teacher console + each team) subscribes to
         // this same node so state stays in sync across devices with no server code.
-        let db, gameRef;
+        // Each class plays in its own game at games/<JOIN CODE>; gameRef points at the one this screen is using.
+        let db, auth, gameRef = null, gameCode = null;
         try {
             firebase.initializeApp(firebaseConfig);
             db = firebase.database();
-            gameRef = db.ref('games/default');
+            auth = firebase.auth();
         } catch (e) {
             console.error('Firebase failed to initialise — game features will be unavailable, but the decoder wheel still works:', e);
         }
@@ -1325,6 +1461,7 @@
                     if (g[order.from] !== me) return { grid: g, valid: false, reason: `${capWord(me)} doesn't currently control ${order.from}, so this move can't be auto-applied.` };
                     if (!(ADJ[order.from] || []).includes(order.to)) return { grid: g, valid: false, reason: `${order.to} isn't adjacent to ${order.from} (only up/down/left/right count), so this move can't be auto-applied.` };
                     if (g[order.to] && g[order.to] !== me) return { grid: g, valid: false, reason: `${order.to} is already held by another agency — MOVE can't capture it, only AMBUSH can take a base.` };
+                    if (g[order.to] === me) return { grid: g, valid: false, reason: `${capWord(me)} already holds ${order.to}, so this move changes nothing.` };
                     g[order.to] = me;
                     return { grid: g, valid: true, reason: '' };
                 }
@@ -1540,29 +1677,17 @@
         /* ---------------- role routing ---------------- */
         /** Entry point from the landing screen: routes to the teacher console, or — for a team — either resumes a saved session (via localStorage) or auto-joins a new one. */
         function goRole(role) {
-            if (role === 'teacher') {
-                show('screen-teacher'); initTeacherView();
-            } else {
-                const savedId = localStorage.getItem('eaa_team_id');
-                const savedSession = localStorage.getItem('eaa_session');
-                if (savedId) {
-                    gameRef.once('value').then(snap => {
-                        const g = snap.val();
-                        if (g && g.sessionId === savedSession && g.teams && g.teams[savedId]) {
-                            enterTeamScreen(savedId);
-                        } else {
-                            localStorage.removeItem('eaa_team_id'); localStorage.removeItem('eaa_session');
-                            autoJoinTeam();
-                        }
-                    });
-                } else {
-                    autoJoinTeam();
-                }
-            }
+            if (role === 'teacher') { teacherEntry(); return; }
+            show('screen-team-join');
+            const saved = localStorage.getItem('eaa_game');
+            const input = document.getElementById('join-code-input');
+            if (saved && !input.value) input.value = saved;
+            document.getElementById('join-status-msg').textContent = saved ? 'Rejoining your last game — or enter a different code.' : '';
         }
         /** Single-page-app style screen switcher: shows only the screen with the given element id, hiding all the others. */
         function show(id) {
-            ['screen-landing', 'screen-teacher', 'screen-team-join', 'screen-team', 'screen-decoder', 'screen-howto'].forEach(s => {
+            ['screen-landing', 'screen-teacher', 'screen-team-join', 'screen-team', 'screen-decoder', 'screen-howto',
+             'screen-teacher-signin', 'screen-teacher-request', 'screen-teacher-pending', 'screen-teacher-home', 'screen-admin'].forEach(s => {
                 document.getElementById(s).classList.toggle('hidden', s !== id);
             });
         }
@@ -1651,12 +1776,13 @@
         function initTeacherView() {
             if (teacherListenerAttached) return;
             teacherListenerAttached = true;
-            gameRef.on('value', snap => {
-                let g = snap.val();
-                if (!g) { g = freshGameState(); gameRef.set(g); return; }
+            teacherGameListener = gameRef.on('value', snap => {
+                const g = snap.val();
+                if (!g) { alert('This game no longer exists.'); openTeacherHome(); return; }
                 teacherState = g;
+                renderGameControls(g);
                 renderTeacher(g);
-            });
+            }, err => { alert('You do not have access to this game: ' + err.message); openTeacherHome(); });
         }
 
         /** Looks up a team's display name by id, falling back to a placeholder if the team is missing. */
@@ -1731,8 +1857,16 @@
             }
             // Recover if the console stopped between advancing and publishing the next intercept.
             if (g.phase === 'revealing' && !g.currentReveal && !teacherResolvePanelOpen) {
-                const nextTeam = (g.revealOrder || [])[g.revealIdx];
-                if (nextTeam && recoveringReveal !== g.revealIdx) { recoveringReveal = g.revealIdx; startReveal(nextTeam); }
+                const key = `${g.sessionId}-${g.round}-${g.revealIdx}`;
+                if (recoveringReveal !== key) {
+                    recoveringReveal = key;
+                    // Give the normal flow a moment to publish the intercept; only step in if it's still missing.
+                    setTimeout(() => gameRef.once('value').then(snap => {
+                        const now = snap.val();
+                        const nextTeam = now && (now.revealOrder || [])[now.revealIdx];
+                        if (now && now.phase === 'revealing' && !now.currentReveal && nextTeam && `${now.sessionId}-${now.round}-${now.revealIdx}` === key) startReveal(nextTeam);
+                    }).catch(() => { recoveringReveal = null; }), 2500);
+                }
             }
 
             if (g.phase === 'roundend') {
@@ -1832,8 +1966,9 @@
                 if (ids.length < 2 || ids.length > MAX_TEAMS || g.phase !== 'lobby') return;
                 const shuffled = shuffle(COLOURS).slice(0, ids.length);
                 const teams = g.teams;
-                shuffle(ids).forEach((id, i) => { teams[id].colour = shuffled[i]; });
-                gameRef.update({ teams, log: [...(g.log || []), '[Lobby] Colours reshuffled.'] });
+                const colours = {};
+                shuffle(ids).forEach((id, i) => { teams[id].colour = shuffled[i]; colours[shuffled[i]] = id; });
+                gameRef.update({ teams, colours, log: [...(g.log || []), '[Lobby] Colours reshuffled.'] });
             });
         }
 
@@ -2268,11 +2403,352 @@
         }
         /** Wipes the entire game back to a fresh lobby state after teacher confirmation — clears all teams, scores and colours. */
         function confirmReset() {
-            if (confirm('Reset and start a new game? This will remove all teams, clear the scoreboard, clear the field log, and reset the map — and any student currently on their team screen will be sent back to the join screen. This cannot be undone.')) {
+            if (confirm('Reset this game? This removes all teams, clears the scoreboard, field log and map, and sends students back to the join screen (the join code stays the same). This cannot be undone.')) {
                 clearInterval(revealTimerHandle); revealTimerHandle = null;
                 teacherResolvePanelOpen = false;
-                gameRef.set(freshGameState());
+                gameRef.once('value').then(snap => {
+                    const g = snap.val() || {};
+                    gameRef.set({ ...freshGameState(), code: g.code || gameCode, label: g.label || '', ownerUid: g.ownerUid, ownerName: g.ownerName || '', status: g.status || 'open', createdAt: g.createdAt || Date.now() });
+                });
             }
+        }
+
+        /* ================= ACCESS, GAMES & ADMIN =================
+           Teachers sign in with Microsoft. Access is: primary owner (set in /config and in the database
+           rules) > owners > admins > activated teachers. Students sign in anonymously and join a game
+           with its code. The database rules (database.rules.json) enforce all of this. */
+        const REQUEST_EMAIL_TO = 'chris.bucknell@outlook.com.au';
+        const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I, O, 0 or 1 — easy to read off a board
+        let access = null; // { user, isPrimary, isOwner, isAdmin, teacher }
+
+        /** Points this screen at games/<code>. */
+        function setGame(code) { gameCode = code; gameRef = db.ref('games/' + code); }
+
+        /** Waits for Firebase to restore any saved sign-in, then returns the current user (or null). */
+        function currentUserReady() {
+            return new Promise(res => { const off = auth.onAuthStateChanged(u => { off(); res(u); }); });
+        }
+
+        /** Students: make sure this browser has an anonymous identity (used as the team id). */
+        async function ensureAnon() {
+            const u = await currentUserReady();
+            if (u) return u;
+            return (await auth.signInAnonymously()).user;
+        }
+
+        /** Works out what a signed-in user may do. */
+        async function loadAccess(user) {
+            const uid = user.uid;
+            const val = async path => { try { return (await db.ref(path).once('value')).val(); } catch (e) { return null; } };
+            const [primary, owner, admin, teacher] = await Promise.all([
+                val('config/primaryOwner'), val('roles/owners/' + uid), val('roles/admins/' + uid), val('teachers/' + uid)
+            ]);
+            const isPrimary = !!primary && primary === uid;
+            const isOwner = isPrimary || !!owner;
+            const isAdmin = isOwner || !!admin;
+            access = { user, isPrimary, isOwner, isAdmin, teacher };
+            return access;
+        }
+
+        /** "Run the game": sign in, then route by access level. */
+        async function teacherEntry() {
+            const u = await currentUserReady();
+            if (!u || u.isAnonymous) { show('screen-teacher-signin'); return; }
+            const a = await loadAccess(u);
+            const status = a.teacher && a.teacher.status;
+            if (a.isAdmin || status === 'active') { openTeacherHome(); return; }
+            if (!a.teacher) { showRequestForm(); return; }
+            showPending(a.teacher);
+        }
+
+        async function teacherSignIn() {
+            const statusEl = document.getElementById('signin-status');
+            statusEl.textContent = 'Opening Microsoft sign-in…';
+            try {
+                const provider = new firebase.auth.OAuthProvider('microsoft.com');
+                provider.setCustomParameters({ prompt: 'select_account' });
+                await auth.signInWithPopup(provider);
+                statusEl.textContent = '';
+                teacherEntry();
+            } catch (e) {
+                statusEl.textContent = e && e.code === 'auth/popup-closed-by-user' ? 'Sign-in was cancelled.' : 'Sign-in failed: ' + (e && e.message ? e.message : e);
+            }
+        }
+
+        async function teacherSignOut() {
+            await auth.signOut();
+            access = null;
+            show('screen-landing');
+        }
+
+        /* ---- access requests ---- */
+        function showRequestForm() {
+            const u = access.user;
+            document.getElementById('req-signed-in').textContent = u.email || u.displayName || 'your Microsoft account';
+            const nameEl = document.getElementById('req-name');
+            if (!nameEl.value) nameEl.value = u.displayName || '';
+            show('screen-teacher-request');
+        }
+
+        async function submitAccessRequest() {
+            const v = id => document.getElementById(id).value.trim();
+            const statusEl = document.getElementById('req-status');
+            const req = {
+                status: 'pending', name: v('req-name'), email: access.user.email || '', school: v('req-school'),
+                role: v('req-role'), years: v('req-years'), classes: parseInt(v('req-classes'), 10) || 0,
+                use: v('req-use'), heard: v('req-heard'), notes: v('req-notes'), requestedAt: Date.now()
+            };
+            if (!req.name || !req.school || !req.role || !req.years || !req.use) { statusEl.textContent = 'Please fill in your name, school, role, year levels and how you plan to use it.'; return; }
+            try {
+                await db.ref('teachers/' + access.user.uid).set(req);
+            } catch (e) { statusEl.textContent = 'Could not save your request: ' + e.message; return; }
+            access.teacher = req;
+            showPending(req);
+            openRequestEmail();
+        }
+
+        function requestEmailText(t) {
+            const lines = [
+                'Hi Chris,', '', 'I would like teacher access to Encrypt & Ambush.', '',
+                'Name: ' + t.name, 'Email (Microsoft account): ' + t.email, 'School: ' + t.school, 'Role / subjects: ' + t.role,
+                'Year levels: ' + t.years, 'Number of classes: ' + (t.classes || '-'), 'Planned use: ' + t.use,
+                'Heard about it from: ' + (t.heard || '-'), 'Other notes: ' + (t.notes || '-'),
+                'Account ID: ' + (access && access.user ? access.user.uid : ''), '',
+                'You can activate or reject this request on the Admin page: ' + location.origin + '/', '', 'Thanks'
+            ];
+            return { subject: 'Encrypt & Ambush teacher access request — ' + t.name + ' (' + t.school + ')', body: lines.join('\n') };
+        }
+        function openRequestEmail() {
+            const m = requestEmailText(access.teacher);
+            location.href = 'mailto:' + REQUEST_EMAIL_TO + '?subject=' + encodeURIComponent(m.subject) + '&body=' + encodeURIComponent(m.body);
+        }
+        async function copyRequestDetails() {
+            const m = requestEmailText(access.teacher);
+            const out = document.getElementById('pending-copy-status');
+            try { await navigator.clipboard.writeText('To: ' + REQUEST_EMAIL_TO + '\nSubject: ' + m.subject + '\n\n' + m.body); out.textContent = 'Copied — paste it into an email to ' + REQUEST_EMAIL_TO + '.'; }
+            catch (e) { out.textContent = 'Could not copy automatically — please email ' + REQUEST_EMAIL_TO + ' with your details.'; }
+        }
+        function showPending(t) {
+            const title = document.getElementById('pending-title'), text = document.getElementById('pending-text');
+            const emailActions = document.getElementById('pending-email-actions');
+            document.getElementById('pending-to').textContent = REQUEST_EMAIL_TO;
+            document.getElementById('pending-uid').textContent = access.user.uid;
+            emailActions.classList.toggle('hidden', t.status !== 'pending');
+            if (t.status === 'pending') { title.textContent = 'Request pending'; text.textContent = 'Thanks, ' + (t.name || '') + '. Your request has been saved. Once it is approved, sign in again and you can start running games.'; }
+            else if (t.status === 'rejected') { title.textContent = 'Request not approved'; text.textContent = 'Your request for teacher access was not approved. Contact ' + REQUEST_EMAIL_TO + ' if you think this is a mistake.'; }
+            else { title.textContent = 'Access paused'; text.textContent = 'Your teacher access is currently deactivated. Contact ' + REQUEST_EMAIL_TO + ' to have it restored.'; }
+            show('screen-teacher-pending');
+        }
+
+        /* ---- my games ---- */
+        let myGamesRef = null;
+        function openTeacherHome() {
+            detachTeacherConsole();
+            const u = access.user;
+            document.getElementById('home-who').textContent = (access.teacher && access.teacher.name) || u.displayName || u.email || '';
+            document.getElementById('btn-open-admin').classList.toggle('hidden', !access.isAdmin);
+            show('screen-teacher-home');
+            if (myGamesRef) myGamesRef.off();
+            myGamesRef = db.ref('teacherGames/' + u.uid);
+            myGamesRef.on('value', async snap => {
+                const list = snap.val() || {};
+                const codes = Object.keys(list).sort((a, b) => (list[b].createdAt || 0) - (list[a].createdAt || 0));
+                const el = document.getElementById('my-games-list');
+                if (!codes.length) { el.innerHTML = 'No games yet — create one above.'; return; }
+                const rows = await Promise.all(codes.map(async c => {
+                    let g = null; try { g = (await db.ref('games/' + c).once('value')).val(); } catch (e) { }
+                    if (!g) return `<div class="team-list-row"><span><code>${c}</code> <span class="muted">(deleted)</span></span><span><button class="ghost small" onclick="forgetGame('${c}')">Remove</button></span></div>`;
+                    const when = new Date(g.createdAt || list[c].createdAt || 0).toLocaleDateString();
+                    const teams = Object.keys(g.teams || {}).length;
+                    return `<div class="team-list-row"><span><code>${c}</code> ${escapeHtml(g.label || '')} <span class="muted">· ${when} · ${teams} team${teams === 1 ? '' : 's'} · ${(g.status || 'open').toUpperCase()} · ${g.phase}</span></span>
+                        <span style="display:flex; gap:6px;"><button class="small" onclick="openConsole('${c}')">Open console</button><button class="ghost small" onclick="deleteGame('${c}')">Delete</button></span></div>`;
+                }));
+                el.innerHTML = rows.join('');
+            });
+        }
+
+        function randomCode() { let c = ''; for (let i = 0; i < 4; i++) c += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]; return c; }
+
+        async function createGame() {
+            const statusEl = document.getElementById('create-status');
+            const label = document.getElementById('new-game-label').value.trim().slice(0, 40);
+            const u = access.user;
+            for (let attempt = 0; attempt < 8; attempt++) {
+                const code = randomCode();
+                const game = { ...freshGameState(), code, label, ownerUid: u.uid, ownerName: (access.teacher && access.teacher.name) || u.displayName || '', status: 'open', createdAt: Date.now() };
+                try {
+                    const res = await db.ref('games/' + code).transaction(cur => (cur === null ? game : undefined));
+                    if (!res.committed) continue; // code already in use — try another
+                    await db.ref('teacherGames/' + u.uid + '/' + code).set({ createdAt: game.createdAt, label });
+                    document.getElementById('new-game-label').value = '';
+                    statusEl.textContent = '';
+                    openConsole(code);
+                    return;
+                } catch (e) { statusEl.textContent = 'Could not create the game: ' + e.message; return; }
+            }
+            statusEl.textContent = 'Could not find a free join code — try again.';
+        }
+
+        async function deleteGame(code) {
+            if (!confirm(`Delete game ${code}? Teams in it will be disconnected. This can't be undone.`)) return;
+            try { await db.ref('games/' + code).remove(); } catch (e) { alert('Could not delete: ' + e.message); return; }
+            const owner = access.user.uid;
+            await db.ref('teacherGames/' + owner + '/' + code).remove().catch(() => { });
+        }
+        function forgetGame(code) { db.ref('teacherGames/' + access.user.uid + '/' + code).remove(); }
+
+        /* ---- console for one game ---- */
+        let teacherGameListener = null;
+        function detachTeacherConsole() {
+            if (gameRef && teacherGameListener) gameRef.off('value', teacherGameListener);
+            teacherGameListener = null;
+            teacherListenerAttached = false;
+            clearInterval(revealTimerHandle); revealTimerHandle = null;
+            clearInterval(entryTimerHandle); entryTimerHandle = null;
+            teacherResolvePanelOpen = false;
+        }
+        function openConsole(code) {
+            if (myGamesRef) { myGamesRef.off(); myGamesRef = null; }
+            detachTeacherConsole();
+            setGame(code);
+            show('screen-teacher');
+            initTeacherView();
+        }
+        function renderGameControls(g) {
+            document.getElementById('join-code-pill').textContent = 'CODE ' + (g.code || gameCode);
+            const st = g.status || 'open';
+            const pill = document.getElementById('game-status-pill');
+            pill.textContent = st === 'open' ? 'JOINING OPEN' : (st === 'locked' ? 'JOINING LOCKED' : 'CLOSED');
+            pill.classList.toggle('live', st === 'open');
+            document.getElementById('btn-lock-game').textContent = st === 'locked' ? 'Unlock joining' : 'Lock joining';
+            document.getElementById('btn-lock-game').disabled = st === 'closed';
+            document.getElementById('btn-close-game').textContent = st === 'closed' ? 'Reopen game' : 'Close game';
+        }
+        function toggleLock() {
+            gameRef.child('status').once('value').then(s => gameRef.update({ status: s.val() === 'locked' ? 'open' : 'locked' }));
+        }
+        function toggleClosed() {
+            gameRef.child('status').once('value').then(s => {
+                if (s.val() === 'closed') { gameRef.update({ status: 'locked' }); return; }
+                if (confirm('Close this game? Students will be shown "closed by your teacher" and can\'t play until you reopen it.')) gameRef.update({ status: 'closed' });
+            });
+        }
+
+        /* ---- students: join with a code ---- */
+        async function joinWithCode() {
+            const statusEl = document.getElementById('join-status-msg');
+            const retryBtn = document.getElementById('btn-join-retry');
+            retryBtn.classList.add('hidden');
+            const code = document.getElementById('join-code-input').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (code.length < 4) { statusEl.textContent = 'Enter the 4-character code from your teacher.'; return; }
+            statusEl.textContent = 'Connecting…';
+            let user;
+            try { user = await ensureAnon(); } catch (e) { statusEl.textContent = 'Could not connect — check your internet and try again.'; retryBtn.classList.remove('hidden'); return; }
+            const uid = user.uid;
+            setGame(code);
+            let g;
+            try { g = (await gameRef.once('value')).val(); } catch (e) { g = null; }
+            if (!g) { statusEl.textContent = `No game found with code ${code}. Check the code on the board.`; return; }
+            if (g.status === 'closed') { statusEl.textContent = 'That game has been closed by your teacher.'; return; }
+            if (g.teams && g.teams[uid]) { rememberGame(code, g); enterTeamScreen(uid); return; } // rejoining on the same device
+            if (g.status === 'locked') { statusEl.textContent = 'Joining is locked for this game — ask your teacher to unlock it.'; return; }
+            if (g.phase !== 'lobby') { statusEl.textContent = 'This game has already started — ask your teacher.'; return; }
+            const used = Object.values(g.teams || {}).map(t => t.colour).filter(Boolean);
+            const free = shuffle(COLOURS.filter(c => !used.includes(c)));
+            if (!free.length) { statusEl.textContent = `Game is full (${MAX_TEAMS}/${MAX_TEAMS} agencies).`; return; }
+            statusEl.textContent = 'Assigning your agency a codename and colour…';
+            for (const colour of free) {
+                // Claim a colour atomically: only the first team to write colours/<colour> gets it.
+                let claimed = false;
+                try { claimed = (await gameRef.child('colours/' + colour).transaction(cur => (cur === null ? uid : undefined))).committed; } catch (e) { claimed = false; }
+                if (!claimed) continue;
+                const names = Object.values(g.teams || {}).map(t => (t.name || '').toLowerCase());
+                try {
+                    await gameRef.child('teams/' + uid).set({ name: generateTeamName(names), colour, shift: generateRandomShift(), score: 0 });
+                } catch (e) { statusEl.textContent = 'Could not join — the game may have just started or been locked.'; retryBtn.classList.remove('hidden'); return; }
+                rememberGame(code, g);
+                enterTeamScreen(uid);
+                return;
+            }
+            statusEl.textContent = 'Could not get a colour — try again.';
+            retryBtn.classList.remove('hidden');
+        }
+        function rememberGame(code, g) { localStorage.setItem('eaa_game', code); localStorage.setItem('eaa_session', g.sessionId); }
+
+        /* ---- admin page ---- */
+        let adminRefs = [];
+        function openAdmin() {
+            if (!access || !access.isAdmin) return;
+            if (myGamesRef) { myGamesRef.off(); myGamesRef = null; }
+            adminRefs.forEach(r => r.off()); adminRefs = [];
+            document.getElementById('admin-role-pill').textContent = access.isPrimary ? 'PRIMARY OWNER' : (access.isOwner ? 'OWNER' : 'ADMIN');
+            document.getElementById('admin-games-panel').classList.toggle('hidden', !access.isOwner);
+            show('screen-admin');
+            const state = { teachers: {}, owners: {}, admins: {}, primary: null };
+            const draw = () => renderAdmin(state);
+            const watch = (path, key) => { const r = db.ref(path); adminRefs.push(r); r.on('value', s => { state[key] = s.val() || {}; draw(); }, () => { }); };
+            watch('teachers', 'teachers'); watch('roles/owners', 'owners'); watch('roles/admins', 'admins');
+            db.ref('config/primaryOwner').once('value').then(s => { state.primary = s.val(); draw(); });
+            if (access.isOwner) { const r = db.ref('games'); adminRefs.push(r); r.on('value', s => renderAdminGames(s.val() || {}), () => { }); }
+        }
+        function personLabel(state, uid) {
+            const t = state.teachers[uid] || state.owners[uid] || state.admins[uid] || {};
+            return `${escapeHtml(t.name || '(unknown)')} <span class="muted">${escapeHtml(t.email || '')}${t.school ? ' · ' + escapeHtml(t.school) : ''}</span>`;
+        }
+        function renderAdmin(state) {
+            const T = state.teachers, isOwner = access.isOwner;
+            const pending = Object.keys(T).filter(id => T[id].status === 'pending').sort((a, b) => (T[a].requestedAt || 0) - (T[b].requestedAt || 0));
+            document.getElementById('admin-pending').innerHTML = pending.length ? pending.map(id => {
+                const t = T[id];
+                return `<div class="panel" style="margin:8px 0; padding:12px;">
+                    <strong>${escapeHtml(t.name)}</strong> <span class="muted">${escapeHtml(t.email || '')}</span><br>
+                    <span class="hint">${escapeHtml(t.school)} · ${escapeHtml(t.role)} · ${escapeHtml(t.years)} · ${t.classes || '?'} class(es)<br>
+                    Use: ${escapeHtml(t.use)}<br>Heard via: ${escapeHtml(t.heard || '-')}${t.notes ? '<br>Notes: ' + escapeHtml(t.notes) : ''}<br>
+                    Requested ${new Date(t.requestedAt || 0).toLocaleString()}</span>
+                    <div class="row" style="margin-top:8px;"><button class="small" onclick="setTeacherStatus('${id}','active')">Activate</button><button class="ghost small" onclick="setTeacherStatus('${id}','rejected')">Reject</button></div></div>`;
+            }).join('') : 'No pending requests.';
+
+            const others = Object.keys(T).filter(id => T[id].status !== 'pending').sort((a, b) => (T[a].name || '').localeCompare(T[b].name || ''));
+            document.getElementById('admin-teachers').innerHTML = others.length ? others.map(id => {
+                const t = T[id], st = t.status;
+                const isAdm = !!state.admins[id], isOwn = !!state.owners[id] || state.primary === id;
+                const btns = [];
+                if (st === 'active') btns.push(`<button class="ghost small" onclick="setTeacherStatus('${id}','deactivated')">Deactivate</button>`);
+                else btns.push(`<button class="ghost small" onclick="setTeacherStatus('${id}','active')">Activate</button>`);
+                if (st === 'active' && !isAdm && !isOwn) btns.push(`<button class="ghost small" onclick="setRole('admins','${id}',true)">Make admin</button>`);
+                if (isOwner && st === 'active' && !isOwn) btns.push(`<button class="ghost small" onclick="setRole('owners','${id}',true)">Make owner</button>`);
+                return `<div class="team-list-row"><span>${personLabel(state, id)} <span class="muted">· ${st.toUpperCase()}${isOwn ? ' · OWNER' : (isAdm ? ' · ADMIN' : '')}</span></span><span style="display:flex; gap:6px; flex-wrap:wrap;">${btns.join('')}</span></div>`;
+            }).join('') : 'No teachers yet.';
+
+            const rows = [];
+            if (state.primary) rows.push(`<div class="team-list-row"><span>${state.primary === access.user.uid ? 'You' : personLabel(state, state.primary)}</span><span class="muted">PRIMARY OWNER</span></div>`);
+            Object.keys(state.owners).filter(id => id !== state.primary).forEach(id => rows.push(`<div class="team-list-row"><span>${personLabel(state, id)}</span><span style="display:flex; gap:6px; align-items:center;"><span class="muted">OWNER</span>${isOwner ? `<button class="ghost small" onclick="setRole('owners','${id}',false)">Remove owner</button>` : ''}</span></div>`));
+            Object.keys(state.admins).forEach(id => rows.push(`<div class="team-list-row"><span>${personLabel(state, id)}</span><span style="display:flex; gap:6px; align-items:center;"><span class="muted">ADMIN</span>${isOwner ? `<button class="ghost small" onclick="setRole('admins','${id}',false)">Remove admin</button>` : ''}</span></div>`));
+            document.getElementById('admin-roles').innerHTML = rows.join('') || 'No admins yet.';
+        }
+        function renderAdminGames(games) {
+            const codes = Object.keys(games).sort((a, b) => (games[b].createdAt || 0) - (games[a].createdAt || 0));
+            document.getElementById('admin-games').innerHTML = codes.length ? codes.map(c => {
+                const g = games[c];
+                return `<div class="team-list-row"><span><code>${c}</code> ${escapeHtml(g.label || '')} <span class="muted">· ${escapeHtml(g.ownerName || g.ownerUid || 'no owner')} · ${new Date(g.createdAt || 0).toLocaleDateString()} · ${(g.status || 'open').toUpperCase()} · ${g.phase}</span></span><button class="ghost small" onclick="adminDeleteGame('${c}')">Delete</button></div>`;
+            }).join('') : 'No games.';
+        }
+        async function setTeacherStatus(uid, status) {
+            try { await db.ref('teachers/' + uid).update({ status, decidedBy: access.user.uid, decidedAt: Date.now() }); }
+            catch (e) { alert('Could not update: ' + e.message); }
+        }
+        async function setRole(kind, uid, on) {
+            try {
+                if (!on) { if (confirm(`Remove this ${kind === 'owners' ? 'owner' : 'admin'}?`)) await db.ref(`roles/${kind}/${uid}`).remove(); return; }
+                const t = (await db.ref('teachers/' + uid).once('value')).val() || {};
+                await db.ref(`roles/${kind}/${uid}`).set({ name: t.name || '', email: t.email || '', school: t.school || '', addedBy: access.user.uid, addedAt: Date.now() });
+            } catch (e) { alert('Not allowed or failed: ' + e.message); }
+        }
+        async function adminDeleteGame(code) {
+            if (!confirm(`Delete game ${code}?`)) return;
+            const g = (await db.ref('games/' + code).once('value')).val() || {};
+            await db.ref('games/' + code).remove().catch(e => alert(e.message));
+            if (g.ownerUid) db.ref('teacherGames/' + g.ownerUid + '/' + code).remove().catch(() => { });
         }
 
         /* ================= TEAM VIEW =================
@@ -2281,46 +2757,6 @@
            attempting to crack other teams' messages during the reveal phase. */
         let myTeamId = null;
         let teamTimerHandle = null;
-
-        /** Auto-joins this device to the game as a brand-new team: atomically claims an id, an unused colour and a generated codename via a Firebase transaction, then remembers the team in localStorage. */
-        function autoJoinTeam() {
-            show('screen-team-join');
-            const statusEl = document.getElementById('join-status-msg');
-            const retryBtn = document.getElementById('btn-join-retry');
-            statusEl.textContent = 'Assigning your agency a codename and colour...';
-            retryBtn.classList.add('hidden');
-
-            const newId = genId();
-            gameRef.transaction(current => {
-                let g = current;
-                if (!g) g = freshGameState();
-                if (g.phase !== 'lobby') return; // abort — game already running
-                const teams = g.teams || {};
-                const ids = Object.keys(teams);
-                if (ids.length >= MAX_TEAMS) return; // abort — full
-                const usedColours = ids.map(id => teams[id].colour).filter(Boolean);
-                const available = shuffle(COLOURS.filter(c => !usedColours.includes(c)));
-                if (available.length === 0) return; // abort — shouldn't happen, but safe
-                const existingNames = ids.map(id => (teams[id].name || '').toLowerCase());
-                const name = generateTeamName(existingNames);
-                teams[newId] = { name, colour: available[0], shift: generateRandomShift(), score: 0 };
-                g.teams = teams;
-                return g;
-            }, (error, committed, snapshot) => {
-                if (error) { statusEl.textContent = 'Could not reach the game — check your connection and try again.'; retryBtn.classList.remove('hidden'); return; }
-                const g = snapshot.val();
-                if (!committed) {
-                    if (g && g.phase && g.phase !== 'lobby') { statusEl.textContent = 'This game has already started — ask the console to reset first.'; }
-                    else if (g && g.teams && Object.keys(g.teams).length >= MAX_TEAMS) { statusEl.textContent = `Game is full (${MAX_TEAMS}/${MAX_TEAMS} agencies).`; }
-                    else { statusEl.textContent = 'Could not join — try again.'; }
-                    retryBtn.classList.remove('hidden');
-                    return;
-                }
-                localStorage.setItem('eaa_team_id', newId);
-                localStorage.setItem('eaa_session', g.sessionId);
-                enterTeamScreen(newId);
-            });
-        }
 
         /** Validates and saves this team's chosen codename and cipher shift while the game is still in the lobby, rejecting duplicate/invalid names or out-of-range shifts. */
         function saveSetup() {
@@ -2384,7 +2820,7 @@
 
         /** Forgets this device's saved team membership and reloads the page, returning to the landing/join flow. */
         function leaveTeam() {
-            localStorage.removeItem('eaa_team_id');
+            localStorage.removeItem('eaa_game');
             localStorage.removeItem('eaa_session');
             location.reload();
         }
@@ -2400,19 +2836,12 @@
             teamListenerAttached = true;
             gameRef.on('value', snap => {
                 const g = snap.val();
-                if (!g) return;
-                if (g.sessionId !== localStorage.getItem('eaa_session')) {
-                    localStorage.removeItem('eaa_team_id'); localStorage.removeItem('eaa_session');
-                    location.reload();
-                    return;
-                }
-                if (!g.teams || !g.teams[id]) {
-                    localStorage.removeItem('eaa_team_id'); localStorage.removeItem('eaa_session');
-                    location.reload();
-                    return;
-                }
+                const back = msg => { localStorage.removeItem('eaa_session'); show('screen-team-join'); document.getElementById('join-status-msg').textContent = msg; teamListenerAttached = false; gameRef.off(); };
+                if (!g) { back('That game has been deleted by your teacher.'); return; }
+                if (g.status === 'closed') { back('This game has been closed by your teacher.'); return; }
+                if (g.sessionId !== localStorage.getItem('eaa_session') || !g.teams || !g.teams[id]) { back('Your teacher reset the game — enter the code again to rejoin.'); return; }
                 renderTeamView(g, id);
-            });
+            }, () => { show('screen-team-join'); document.getElementById('join-status-msg').textContent = 'Lost access to the game.'; });
         }
 
         /** Main team-screen render function: updates the badge, setup form, board, legend, incoming-message panel and phase-specific panel (waiting/submit/round-end/ended) for this team. */
@@ -2618,17 +3047,22 @@
         }
 
         /** Submits this team's guess at the plaintext of the currently revealed message and records whether it was correct. */
+        let crackInFlight = false;
         function submitCrack() {
             const guess = normalize(document.getElementById('tc-guess-input').value);
+            if (!guess || crackInFlight) return;
+            crackInFlight = true; // one guess per intercept — ignore repeat clicks while saving
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const cr = g.currentReveal;
+                if (!cr || (g.crackAttempts || {})[myTeamId]) { crackInFlight = false; return; }
                 const actual = normalize(g.submissions[cr.team].plaintext);
                 const correct = guess === actual;
                 gameRef.child(`crackAttempts/${myTeamId}`).set({ guess, correct, at: Date.now() });
                 document.getElementById('tc-guess-status').textContent = correct ? 'Correct — you cracked it!' : 'Incorrect. Attempt logged.';
                 document.getElementById('tc-guess-area').classList.add('hidden');
-            });
+                crackInFlight = false;
+            }).catch(() => { crackInFlight = false; });
         }
 
         /* ---------------- helpers ---------------- */

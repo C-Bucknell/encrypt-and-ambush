@@ -338,3 +338,21 @@ Scoring: 1 point per square, 1 extra per base held (so a base is worth 2),
   while only the game-console/team screens would be affected. Worth knowing
   if you ever troubleshoot a "nothing's loading" report — check whether it's
   the whole page or just the parts that need the live database.
+
+---
+
+## 9. Teacher sign-in, roles and database rules (phase 5)
+
+1. **Firebase → Authentication → Sign-in method:** enable **Microsoft** (client ID and
+   secret from an Azure / Entra app registration whose redirect URI is the one Firebase
+   shows) and **Anonymous** (used by students).
+2. **Primary owner:** sign in once with your Microsoft account. The pending screen
+   shows your **Account ID**. Put it in two places:
+   - `database.rules.json` — replace `__PRIMARY_OWNER_UID__`
+   - Realtime Database → Data → add `config/primaryOwner` with your Account ID as the value
+3. **Publish the rules:** paste `database.rules.json` into Realtime Database → Rules and
+   click Publish (or run `firebase deploy --only database`). The GitHub Action only
+   deploys the website, not the rules.
+4. The Microsoft client secret expires (24 months at most). Make a new one in Azure and
+   paste it into Firebase before then, or teacher sign-in stops working.
+

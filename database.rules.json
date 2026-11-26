@@ -1,0 +1,72 @@
+{
+  "rules": {
+    "config": {
+      ".read": true,
+      ".write": false
+    },
+    "roles": {
+      "owners": {
+        ".read": "(auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists() || root.child('roles/admins/' + auth.uid).exists()))",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "(auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists())) && $uid !== '__PRIMARY_OWNER_UID__'"
+        }
+      },
+      "admins": {
+        ".read": "(auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists() || root.child('roles/admins/' + auth.uid).exists()))",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "(auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists())) || ((auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists() || root.child('roles/admins/' + auth.uid).exists())) && !data.exists() && newData.exists())"
+        }
+      }
+    },
+    "teachers": {
+      ".read": "(auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists() || root.child('roles/admins/' + auth.uid).exists()))",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "(auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists() || root.child('roles/admins/' + auth.uid).exists())) || (auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.child('status').val() === 'pending' && (!data.exists() || data.child('status').val() === 'pending'))",
+        ".validate": "newData.hasChildren(['status', 'name']) && newData.child('status').val().matches(/^(pending|active|rejected|deactivated)$/) && newData.child('name').val().length <= 80"
+      }
+    },
+    "teacherGames": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid) || (auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists()))",
+        ".write": "(auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous') || (auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists()))"
+      }
+    },
+    "games": {
+      ".read": "(auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists()))",
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((data.exists() && ((root.child('games/' + $code + '/ownerUid').val() === auth.uid && ((auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists() || root.child('roles/admins/' + auth.uid).exists())) || root.child('teachers/' + auth.uid + '/status').val() === 'active')) || (auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists())))) || (!data.exists() && newData.child('ownerUid').val() === auth.uid && ((auth != null && (auth.uid === '__PRIMARY_OWNER_UID__' || root.child('roles/owners/' + auth.uid).exists() || root.child('roles/admins/' + auth.uid).exists())) || root.child('teachers/' + auth.uid + '/status').val() === 'active')))",
+        ".validate": "!data.exists() || newData.child('ownerUid').val() === data.child('ownerUid').val()",
+        "colours": {
+          "$colour": {
+            ".write": "auth != null && !data.exists() && newData.val() === auth.uid && root.child('games/' + $code + '/status').val() === 'open' && root.child('games/' + $code + '/phase').val() === 'lobby'"
+          }
+        },
+        "teams": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && newData.exists() && (data.exists() || (root.child('games/' + $code + '/status').val() === 'open' && root.child('games/' + $code + '/phase').val() === 'lobby' && root.child('games/' + $code + '/colours/' + newData.child('colour').val()).val() === auth.uid))",
+            ".validate": "auth.uid !== $uid || root.child('games/' + $code + '/ownerUid').val() === auth.uid || (!data.exists() && newData.child('score').val() === 0 && !newData.child('stolen').exists() && !newData.child('lost').exists()) || (data.exists() && newData.child('score').val() === data.child('score').val() && newData.child('stolen').val() === data.child('stolen').val() && newData.child('lost').val() === data.child('lost').val() && newData.child('colour').val() === data.child('colour').val() && (newData.child('shift').val() === data.child('shift').val() || root.child('games/' + $code + '/phase').val() === 'lobby'))"
+          }
+        },
+        "submissions": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('games/' + $code + '/phase').val() === 'submitting' && root.child('games/' + $code + '/entryClosed').val() !== true && root.child('games/' + $code + '/teams/' + $uid).exists()"
+          }
+        },
+        "crackAttempts": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('games/' + $code + '/currentReveal').exists() && root.child('games/' + $code + '/currentReveal/team').val() !== $uid && root.child('games/' + $code + '/currentReveal/timerEnded').val() !== true && root.child('games/' + $code + '/teams/' + $uid).exists()"
+          }
+        },
+        "currentReveal": {
+          "choice": {
+            ".write": "auth != null && data.child('by').val() === auth.uid && !data.child('action').exists() && newData.child('by').val() === auth.uid && newData.child('deadline').val() === data.child('deadline').val() && newData.child('action').val().matches(/^(block|steal|change)$/)"
+          }
+        }
+      }
+    }
+  }
+}
