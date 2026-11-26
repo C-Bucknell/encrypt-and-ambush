@@ -53,6 +53,21 @@ option on the landing screen) — nothing needs explaining verbally.
 
 ---
 
+## Teachers, classes and access
+
+- **Teacher sign-in with Microsoft.** New teachers fill in a short request form; an
+  email with their details opens on their computer for them to send to the owner.
+  Requests are approved or rejected on the **Admin** page.
+- **One game per class.** Each game has its own 4-character join code, so several
+  classes can play at once. Students join with the code — no accounts needed.
+- **Lock / close.** Teachers can lock joining once teams are in, and close a game at
+  the end of the lesson so students can't keep playing.
+- **Roles:** primary owner (can't be removed) › owners (add/remove owners and
+  admins) › admins (approve teachers, add admins) › teachers. Enforced by the
+  database rules in `database.rules.json`, not just the page.
+
+---
+
 ## Features
 
 - **Live multiplayer** across any number of devices, powered by a free Firebase
@@ -135,9 +150,9 @@ another teacher — there's no toolchain to set up before you can even open the 
   sized for a single-lesson format
 - One live game at a time per Firebase project — don't run two classes
   simultaneously on the same deployed link without resetting between them
-- No login system yet — team identity lives in the browser's local storage, and the
-  database rules allow anyone with the link to read and write game data. Teacher
-  sign-in, separate games per class and locked-down rules are planned next
+- Students can still read a game's raw data (including other teams' shifts) with
+  browser developer tools if they go looking — fine for a classroom game, but not
+  tamper-proof
 
 See `BUILD_GUIDE.md` for the full, detailed list and the reasoning behind each one.
 

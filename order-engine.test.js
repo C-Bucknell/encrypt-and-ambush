@@ -63,6 +63,8 @@ test('MOVE claims an adjacent empty square only', () => {
   assert.equal(E.applyOrder(startGrid(), 'MOVE A3 A2', ctx('red')).valid, false, 'from square not owned');
   const g = { ...startGrid(), A2: 'blue' };
   assert.equal(E.applyOrder(g, 'MOVE A1 A2', ctx('red')).valid, false, 'enemy-held square');
+  const own = { ...startGrid(), A2: 'red' };
+  assert.equal(E.applyOrder(own, 'MOVE A1 A2', ctx('red')).valid, false, 'already your square');
 });
 
 test('a standing AMBUSH captures the target base for the attacker', () => {
