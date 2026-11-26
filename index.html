@@ -823,7 +823,7 @@
                     <p class="muted" id="rend-caption">All orders for this round have been resolved.</p>
                     <div class="divider"></div>
                     <button class="block" id="btn-next-round" onclick="teacherNextRound()">Start round <span id="rend-next">2</span></button>
-                    <button class="block" id="btn-end-practice" onclick="teacherEndPractice()">Start the real game</button>
+                    <button class="block" id="btn-end-practice" onclick="teacherEndPractice()">End practice — back to lobby</button>
                 </div>
 
                 <div class="panel hidden" id="teacher-ended-panel">
@@ -877,6 +877,11 @@
             </div>
         </div>
         <div class="wrap" style="max-width:640px;">
+
+            <div class="panel hidden" id="team-mode-banner" style="border-color:var(--amber);">
+                <h3 id="team-mode-title" style="color:var(--amber);">Practice round</h3>
+                <p class="hint" id="team-mode-text" style="margin-top:0;"></p>
+            </div>
 
             <div class="panel">
                 <h3>Setup</h3>
@@ -1050,6 +1055,9 @@
 
             <div class="panel">
                 <h3>Step 1 — Join &amp; set up</h3>
+                <p class="hint" style="margin-top:0;">Your teacher may start with a <strong>practice round</strong> first. It
+                    plays exactly like a real round but nothing counts. Afterwards you'll be asked to choose a
+                    <strong>new</strong> shift, because other teams may have cracked your practice one.</p>
                 <p class="hint">Click <strong>Join a team</strong> on the main menu — you'll get a random codename and colour
                     automatically, no choice needed. In the <strong>Setup</strong> panel, enter a Caesar cipher shift (any
                     number 1–25) and click <strong>Save</strong>. Do this <em>before</em> the teacher starts the game — your
@@ -1657,8 +1665,10 @@
         function teamColour(g, id) { return g.teams && g.teams[id] && g.teams[id].colour; }
 
         /** Main teacher-console render function: draws the lobby/round/scoreboard UI for the current game phase (lobby, submitting, revealing, roundend, ended). */
+        let practiceRunning = false; // mirrors g.practice for the top-bar End game button
         let recoveringReveal = null; // guards the stranded-reveal recovery so it only fires once per intercept
         function renderTeacher(g) {
+            practiceRunning = !!g.practice && g.phase !== 'lobby' && g.phase !== 'ended';
             document.getElementById('phase-pill').textContent = g.practice && g.phase !== 'lobby' && g.phase !== 'ended' ? 'PRACTICE' : g.phase.toUpperCase();
             document.getElementById('phase-pill').classList.toggle('live', g.phase !== 'lobby' && g.phase !== 'ended');
             document.getElementById('btn-end-game-top').disabled = (g.phase === 'lobby' || g.phase === 'ended');
@@ -1684,7 +1694,8 @@
                 listEl.innerHTML = ids.map(id => {
                     const t = g.teams[id];
                     const swatch = t.colour ? `<span class="team-swatch t-${t.colour}"></span>${cap(t.colour)} · ${CODE_OF[t.colour]}` : `<span class="status-pill unassigned">unassigned</span>`;
-                    return `<div class="team-list-row"><span>${escapeHtml(t.name)}</span><span>${swatch}</span></div>`;
+                    const rekeyTag = g.rekey ? (t.setupSaved ? ' <span class="txt-green">· new shift saved</span>' : ' <span class="txt-red">· choosing new shift</span>') : '';
+                    return `<div class="team-list-row"><span>${escapeHtml(t.name)}${rekeyTag}</span><span>${swatch}</span></div>`;
                 }).join('');
             }
             const allHaveColour = ids.length > 0 && ids.every(id => g.teams[id].colour);
@@ -1727,7 +1738,7 @@
             if (g.phase === 'roundend') {
                 if (g.practice) {
                     document.getElementById('rend-heading').textContent = 'Practice round complete';
-                    document.getElementById('rend-caption').textContent = 'That was just a demo — nothing here counted. Ready to start the real thing?';
+                    document.getElementById('rend-caption').textContent = 'That was just a demo — nothing here counted. Ending practice returns everyone to the lobby to choose a new cipher shift (others may have cracked theirs), then you start the real game.';
                     document.getElementById('btn-next-round').classList.add('hidden');
                     document.getElementById('btn-end-practice').classList.remove('hidden');
                 } else {
@@ -1832,7 +1843,7 @@
                 const g = snap.val();
                 const grid = baseGridFor(g.teams || {});
                 gameRef.update({
-                    phase: 'submitting', round: 1, practice: false, grid, submissions: {}, revealOrder: [], revealIdx: -1,
+                    phase: 'submitting', round: 1, practice: false, rekey: false, grid, submissions: {}, revealOrder: [], revealIdx: -1,
                     currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g), log: [logEntry(g, 'Game started. Round 1 begins.')]
                 });
             });
@@ -1856,12 +1867,15 @@
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const teams = { ...g.teams };
-                Object.keys(teams).forEach(id => { teams[id] = { ...teams[id], score: 0, stolen: 0, lost: 0 }; });
+                // Wipe practice points and ask every team for a new shift: rivals may have cracked the practice one.
+                Object.keys(teams).forEach(id => {
+                    teams[id] = { ...teams[id], score: 0, stolen: 0, lost: 0, practiceShift: teams[id].shift, setupSaved: false };
+                });
                 const grid = baseGridFor(teams);
                 gameRef.update({
-                    phase: 'submitting', round: 1, practice: false, teams, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g),
-                    log: [logEntry(g, 'Practice round finished. The real game starts now — scores and territory reset.')]
+                    phase: 'lobby', round: 1, practice: false, rekey: true, teams, grid, submissions: {}, revealOrder: [], revealIdx: -1,
+                    currentReveal: null, crackAttempts: {}, defended: {}, entryClosed: false,
+                    log: [logEntry(g, 'Practice round finished — scores and territory reset. Teams: choose a new cipher shift, then the console starts the real game.')]
                 });
             });
         }
@@ -2242,6 +2256,10 @@
         }
         /** Ends the game after teacher confirmation, moving to the final results screen. */
         function teacherEndGame() {
+            if (practiceRunning) {
+                if (confirm('This is the practice round. End practice and return everyone to the lobby? Nothing from practice counts.')) teacherEndPractice();
+                return;
+            }
             if (!confirm('End the game now and show final results?')) return;
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -2325,6 +2343,8 @@
                     return;
                 }
                 const teams = g.teams || {};
+                const me = teams[myTeamId] || {};
+                if (g.rekey && me.practiceShift === shiftVal) { statusEl.textContent = 'Pick a different shift from your practice round — rivals may have cracked that one.'; return; }
                 const taken = Object.keys(teams).some(id => id !== myTeamId && (teams[id].name || '').toLowerCase() === name.toLowerCase());
                 if (taken) { statusEl.textContent = 'That codename is already taken — pick another.'; return; }
 
@@ -2408,6 +2428,20 @@
             const shiftInput = document.getElementById('shift-input');
             const gameStarted = g.phase !== 'lobby';
             const saved = !!t.setupSaved;
+            // Practice / re-key banner
+            const banner = document.getElementById('team-mode-banner');
+            const inPractice = !!g.practice && g.phase !== 'lobby' && g.phase !== 'ended';
+            const rekeying = !!g.rekey && g.phase === 'lobby';
+            banner.classList.toggle('hidden', !inPractice && !rekeying);
+            if (inPractice) {
+                document.getElementById('team-mode-title').textContent = 'Practice round — this doesn\'t count';
+                document.getElementById('team-mode-text').textContent = 'Try out ordering, cracking and choosing. Scores and the map reset when practice ends.';
+            } else if (rekeying) {
+                document.getElementById('team-mode-title').textContent = saved ? 'New shift saved — ready for the real game' : 'Practice over — choose a NEW cipher shift';
+                document.getElementById('team-mode-text').textContent = saved
+                    ? 'Wait for the console to start the real game.'
+                    : 'Other teams may have cracked your practice shift. Enter a different shift below and click Save before the real game starts.';
+            }
             if (document.activeElement !== shiftInput) shiftInput.value = (t.shift != null ? t.shift : '');
             nameInput.disabled = gameStarted;
             shiftInput.disabled = gameStarted;

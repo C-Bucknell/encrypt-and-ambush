@@ -236,7 +236,11 @@ If that works end-to-end, you're ready to run it live.
    codename already attached — no action needed from you. An optional
    **Reshuffle colours** button is there if you want to remix before
    starting (lobby-only).
-6. Click **Start game** (enabled once at least 2 teams have joined).
+6. Optionally click **Start practice round** first: it plays like a real round
+   but nothing counts, and team screens say so. When it ends, click **End practice —
+   back to lobby**. Teams must choose a new cipher shift (the old one is refused,
+   because rivals may have cracked it); your team list shows who has re-keyed.
+   Then click **Start game** (enabled once at least 2 teams have joined).
 7. Each round: every team types one order (e.g. `MOVE A1 A2`, `AMBUSH RUBY`
    or just `DEFEND`) before the **entry timer** runs out — set it under
    **Game settings** (15–180 seconds, default 45). The box validates as they type,

@@ -74,8 +74,10 @@ option on the landing screen) — nothing needs explaining verbally.
   be used to brute-force every shift within the crack window
 - **An illustrated "How to Play" page** — step-by-step instructions with diagrams,
   built into the app, plus a quick-access link from every team's own screen
-- **A practice round option** — run one full ungraded round to teach the flow,
-  then reset straight into the real game without re-entering any team setup
+- **A practice round option** — run one full ungraded round to teach the flow.
+  Team screens show a "doesn't count" banner; afterwards everyone returns to the
+  lobby to choose a new cipher shift (rivals may have cracked the practice one),
+  keeping their team, colour and codename
 - **Teacher controls**: reshuffle colours, jump to the decoder wheel or back to the
   menu, end the game early, or fully reset back to a clean lobby — all from the
   console's top bar
