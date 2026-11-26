@@ -751,6 +751,9 @@
                     <input type="number" id="teacher-max-rounds" min="1" max="20" value="4" onchange="saveMaxRounds()">
                     <p class="hint" id="teacher-rounds-status">Current round limit: 4</p>
                     <p class="hint">Changing this updates the game end condition immediately — the final round is whatever the current total is set to.</p>
+                    <label style="margin-top:12px;">Time to enter orders (seconds)</label>
+                    <input type="number" id="teacher-entry-seconds" min="15" max="180" value="45" onchange="saveEntrySeconds()">
+                    <p class="hint">Teams that haven't submitted when this runs out miss their order for that round. Applies from the next round.</p>
                 </div>
 
                 <div class="panel" id="teacher-lobby-panel">
@@ -765,6 +768,7 @@
 
                 <div class="panel hidden" id="teacher-submit-panel">
                     <h3>Round <span id="t-round-num">1</span> — Orders being encrypted</h3>
+                    <div class="timer" id="t-entry-timer">45</div>
                     <div id="t-submit-status" class="muted">Waiting on teams to submit...</div>
                     <div id="t-pending-submissions" class="muted" style="margin-top:8px; line-height:1.8;"></div>
                     <div class="divider"></div>
@@ -929,6 +933,8 @@
 
             <div class="panel hidden" id="team-submit-panel">
                 <h3>Round <span id="team-round-num">1</span> — Encrypt your order</h3>
+                <div class="timer" id="team-entry-timer">45</div>
+                <p class="hint center" style="margin-top:0;">Submit before the timer runs out, or you miss your order this round.</p>
                 <div class="grid2-tight" style="margin-top:0;">
                     <div>
                         <label>Plain text order</label>
@@ -959,7 +965,7 @@
 
             <div class="panel">
                 <h3>Scoreboard</h3>
-                <p class="hint" style="margin-top:0;">Score = squares held + successful cracks (+1 each) + points stolen − points lost.</p>
+                <p class="hint" style="margin-top:0;">Score = 1 per square (bases are worth 2) + 1 per successful crack + points stolen − points lost.</p>
                 <div id="team-scoreboard"></div>
             </div>
 
@@ -1411,10 +1417,29 @@
             return { interception: 1, stolen: outcome === 'steal' ? 1 : 0, lost: outcome === 'steal' ? 1 : 0 };
         }
 
-        /** A team's total: squares held + interceptions + points stolen − points lost. */
+        /** How many base squares (any team's) this colour currently holds. */
+        function basesHeld(colour, grid) {
+            return Object.keys(BASES).filter(sq => (grid || {})[sq] === colour).length;
+        }
+
+        /** A team's total: 1 per square + 1 extra per base held (so a base is worth 2) + interceptions + points stolen − points lost. */
         function teamTotal(team, grid) {
             const territory = Object.values(grid || {}).filter(o => o === team.colour).length;
-            return territory + (team.score || 0) + (team.stolen || 0) - (team.lost || 0);
+            return territory + basesHeld(team.colour, grid) + (team.score || 0) + (team.stolen || 0) - (team.lost || 0);
+        }
+
+        /* ---------------- ENTRY TIMER ---------------- */
+        const ENTRY_DEFAULT = 45, ENTRY_MIN = 15, ENTRY_MAX = 180;
+        /** Clamps the teacher's entry-time setting to a whole number of seconds in range. */
+        function clampEntrySeconds(v) {
+            const n = parseInt(v, 10);
+            if (!Number.isInteger(n)) return ENTRY_DEFAULT;
+            return Math.min(ENTRY_MAX, Math.max(ENTRY_MIN, n));
+        }
+        /** Fields that open a fresh order-entry window (added to every update that enters the submitting phase). */
+        function entryWindow(g, now) {
+            const secs = clampEntrySeconds(g && g.entrySeconds);
+            return { entryEnd: (now || Date.now()) + secs * 1000, entryClosed: false };
         }
         /* ---------------- END ORDER ENGINE ---------------- */
 
@@ -1455,7 +1480,7 @@
         /** Builds a brand-new game object with default lobby phase, round 1, and empty teams/grid/log — used on first load and on reset. */
         function freshGameState() {
             return {
-                phase: 'lobby', round: 1, maxRounds: 4, sessionId: 's' + Date.now(), practice: false,
+                phase: 'lobby', round: 1, maxRounds: 4, entrySeconds: ENTRY_DEFAULT, sessionId: 's' + Date.now(), practice: false,
                 teams: {}, grid: {}, submissions: {}, revealOrder: [], revealIdx: -1,
                 currentReveal: null, crackAttempts: {}, defended: {}, log: []
             };
@@ -1611,6 +1636,8 @@
                 const safeMax = Number.isInteger(g.maxRounds) ? g.maxRounds : 4;
                 maxRoundInput.value = safeMax;
             }
+            const entryInput = document.getElementById('teacher-entry-seconds');
+            if (entryInput && document.activeElement !== entryInput) entryInput.value = clampEntrySeconds(g.entrySeconds);
             if (maxRoundStatus) {
                 const round = Number.isInteger(g.round) ? g.round : 1;
                 maxRoundStatus.textContent = `Current round limit: ${g.maxRounds || 4} • round ${round}`;
@@ -1647,7 +1674,12 @@
                 document.getElementById('t-submit-status').textContent = `${subCount} / ${ids.length} agencies have submitted.`;
                 const pendingList = pending.length ? pending.map(id => `<span class="team-swatch t-${g.teams[id].colour}"></span>${escapeHtml(g.teams[id].name)}`).join(' ') : 'All teams are ready.';
                 document.getElementById('t-pending-submissions').innerHTML = pending.length ? `Still waiting: ${pendingList}` : 'Everyone has submitted this round.';
-                document.getElementById('btn-begin-reveal').disabled = subCount < ids.length || subCount === 0;
+                // Begin once everyone is in, or once the entry timer has closed (teams that missed it sit the round out).
+                const beginBtn = document.getElementById('btn-begin-reveal');
+                beginBtn.disabled = !(subCount >= ids.length || g.entryClosed);
+                beginBtn.textContent = g.entryClosed && subCount === 0 ? 'No orders this round — end round' : 'Begin intercepts';
+                if (g.entryClosed && pending.length) document.getElementById('t-pending-submissions').innerHTML = `Time's up. Missed this round: ${pendingList}`;
+                if (!entryTimerHandle) entryTimerHandle = setInterval(tickEntryTimer, 250);
             }
 
             if (g.phase === 'revealing' && g.currentReveal && !teacherResolvePanelOpen) {
@@ -1763,7 +1795,7 @@
                 const grid = baseGridFor(g.teams || {});
                 gameRef.update({
                     phase: 'submitting', round: 1, practice: false, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, defended: {}, log: [logEntry(g, 'Game started. Round 1 begins.')]
+                    currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g), log: [logEntry(g, 'Game started. Round 1 begins.')]
                 });
             });
         }
@@ -1775,7 +1807,7 @@
                 const grid = baseGridFor(g.teams || {});
                 gameRef.update({
                     phase: 'submitting', round: 1, practice: true, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, defended: {},
+                    currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g),
                     log: [logEntry(g, 'Practice round started — scores and territory won\'t count toward the real game.')]
                 });
             });
@@ -1790,7 +1822,7 @@
                 const grid = baseGridFor(teams);
                 gameRef.update({
                     phase: 'submitting', round: 1, practice: false, teams, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, defended: {},
+                    currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g),
                     log: [logEntry(g, 'Practice round finished. The real game starts now — scores and territory reset.')]
                 });
             });
@@ -1801,7 +1833,11 @@
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const order = shuffle(Object.keys(g.submissions || {}));
-                gameRef.update({ phase: 'revealing', revealOrder: order, revealIdx: 0 });
+                if (order.length === 0) { // nobody submitted before the timer ran out
+                    gameRef.update({ phase: 'roundend', entryClosed: true, log: [...(g.log || []), logEntry(g, 'No orders were submitted this round.')] });
+                    return;
+                }
+                gameRef.update({ phase: 'revealing', revealOrder: order, revealIdx: 0, entryClosed: true });
                 startReveal(order[0]);
             });
         }
@@ -2037,10 +2073,10 @@
                 const t = teams[id];
                 const territory = Object.values(grid).filter(o => o === t.colour).length;
                 const total = teamTotal(t, grid);
-                return { id, name: t.name, colour: t.colour, territory, score: t.score || 0, stolen: t.stolen || 0, lost: t.lost || 0, total };
+                return { id, name: t.name, colour: t.colour, territory, bases: basesHeld(t.colour, grid), score: t.score || 0, stolen: t.stolen || 0, lost: t.lost || 0, total };
             }).sort((a, b) => b.total - a.total);
             document.getElementById(elId).innerHTML = rows.map(r =>
-                `<div class="score-row"><span><span class="team-swatch t-${r.colour}"></span>${escapeHtml(r.name)} <span class="muted">(${CODE_OF[r.colour]} · ${r.territory} sq, ${r.score} intercept${r.stolen ? `, +${r.stolen} stolen` : ''}${r.lost ? `, −${r.lost} lost` : ''})</span></span><span class="score-val">${r.total}</span></div>`
+                `<div class="score-row"><span><span class="team-swatch t-${r.colour}"></span>${escapeHtml(r.name)} <span class="muted">(${CODE_OF[r.colour]} · ${r.territory} sq${r.bases ? ` (${r.bases} base${r.bases > 1 ? 's' : ''} +${r.bases})` : ''}, ${r.score} intercept${r.stolen ? `, +${r.stolen} stolen` : ''}${r.lost ? `, −${r.lost} lost` : ''})</span></span><span class="score-val">${r.total}</span></div>`
             ).join('') || '<p class="muted">No teams yet.</p>';
         }
 
@@ -2091,6 +2127,33 @@
             });
         }
 
+        /** Saves the teacher's order-entry time (15–180 s). Takes effect the next time an entry window opens. */
+        function saveEntrySeconds() {
+            const input = document.getElementById('teacher-entry-seconds');
+            const secs = clampEntrySeconds(input.value);
+            input.value = secs;
+            gameRef.update({ entrySeconds: secs });
+        }
+
+        /** Console-side: closes order entry when the timer runs out. Teams read this flag, so device clocks don't need to agree. */
+        let entryTimerHandle = null;
+        function tickEntryTimer() {
+            gameRef.once('value').then(snap => {
+                const g = snap.val();
+                const el = document.getElementById('t-entry-timer');
+                if (!g || g.phase !== 'submitting') { clearInterval(entryTimerHandle); entryTimerHandle = null; return; }
+                const left = Math.max(0, Math.ceil(((g.entryEnd || 0) - Date.now()) / 1000));
+                if (el) { el.textContent = g.entryClosed ? '0' : left; el.classList.toggle('danger', left <= 10); }
+                if (!g.entryClosed && g.entryEnd && left <= 0) {
+                    const missed = Object.keys(g.teams || {}).filter(id => !(g.submissions || {})[id]);
+                    const log = [...(g.log || [])];
+                    if (missed.length) log.push(logEntry(g, `Order entry closed. No order from: ${missed.map(id => teamName(g, id)).join(', ')}.`));
+                    else log.push(logEntry(g, 'Order entry closed.'));
+                    gameRef.update({ entryClosed: true, log });
+                }
+            });
+        }
+
         /** Advances the game to the next round, clearing submissions/reveal state ready for teams to submit new orders. */
         function teacherNextRound() {
             gameRef.once('value').then(snap => {
@@ -2098,7 +2161,7 @@
                 const nextRound = Math.min(g.round + 1, g.maxRounds || 4);
                 gameRef.update({
                     phase: 'submitting', round: nextRound, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, defended: {}, log: [...(g.log || []), logEntry(g, `Round ${nextRound} begins.`)]
+                    currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g), log: [...(g.log || []), logEntry(g, `Round ${nextRound} begins.`)]
                 });
             });
         }
@@ -2332,8 +2395,13 @@
                 if (already) {
                     waiting.classList.remove('hidden');
                     document.getElementById('team-waiting-msg').textContent = 'Order submitted. Waiting for other agencies...';
+                } else if (g.entryClosed) {
+                    waiting.classList.remove('hidden');
+                    document.getElementById('team-waiting-msg').textContent = 'Time ran out — you missed your order this round. You can still crack other agencies\' messages.';
                 } else {
                     submitP.classList.remove('hidden');
+                    teamEntryEnd = g.entryEnd || 0;
+                    if (!teamEntryHandle) teamEntryHandle = setInterval(tickTeamEntryTimer, 250);
                 }
             } else if (g.phase === 'roundend') {
                 roundendP.classList.remove('hidden');
@@ -2343,6 +2411,17 @@
             }
 
             renderScoreboardInto('team-scoreboard', g);
+        }
+
+        /** Team-side countdown display for order entry (the console decides when entry actually closes). */
+        let teamEntryEnd = 0, teamEntryHandle = null;
+        function tickTeamEntryTimer() {
+            const el = document.getElementById('team-entry-timer');
+            const panel = document.getElementById('team-submit-panel');
+            if (!el || panel.classList.contains('hidden')) { clearInterval(teamEntryHandle); teamEntryHandle = null; return; }
+            const left = Math.max(0, Math.ceil((teamEntryEnd - Date.now()) / 1000));
+            el.textContent = left;
+            el.classList.toggle('danger', left <= 10);
         }
 
         /** Shows a live encrypted preview of the plaintext order box, using this team's saved cipher shift. A bare DEFEND is previewed with the team's codename added. */
@@ -2364,7 +2443,7 @@
         function submitCommand() {
             const raw = document.getElementById('plaintext-input').value;
             const statusEl = document.getElementById('team-submit-status');
-            gameRef.child('teams').once('value').then(s => {
+            gameRef.child('teams').once('value').then(async s => {
                 const all = s.val() || {};
                 const team = all[myTeamId] || {};
                 const validity = validateOrderText(raw, team.colour, joinedColours(all));
@@ -2374,6 +2453,8 @@
                 }
                 const plaintext = expandOrder(raw, team.colour);
                 const shift = team.shift;
+                const closed = await gameRef.child('entryClosed').once('value').then(x => x.val());
+                if (closed) { statusEl.textContent = 'Time ran out — orders are closed for this round.'; return; }
                 if (!shift) { statusEl.textContent = 'Set your cipher shift above before submitting.'; return; }
                 const ciphertext = caesarEncrypt(plaintext, shift);
                 gameRef.child(`submissions/${myTeamId}`).set({ plaintext, ciphertext, submittedAt: Date.now() });
