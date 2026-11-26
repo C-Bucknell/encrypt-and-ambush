@@ -29,15 +29,22 @@ Computing or similar. Works well as a single 50-minute lesson.
 
 ## How it plays
 
-1. Teams join automatically — each gets a random codename (e.g. "Silver Hawk") and
-   colour, no setup needed beyond choosing a personal Caesar cipher shift (1–25).
-2. Each round, every team submits **one** encrypted order:
-   - `MOVE <from> <to>` — claim an adjacent square on the shared map
-   - `AMBUSH <codename>` — strip a square from a rival agency
-3. The console reveals one team's encrypted order at a time. Everyone else has
-   **30 seconds** to crack it before it's resolved.
-4. Points = squares controlled + 1 for every message you successfully crack.
-5. Repeat for several rounds — highest score wins.
+1. Teams join automatically — each gets a random team name, a colour and a fixed
+   4-letter codename (e.g. RUBY), then chooses a personal Caesar cipher shift (1–25).
+2. Each round, every team submits **one** encrypted order before the entry timer
+   runs out (teacher sets it, 45 seconds by default):
+   - `MOVE <from> <to>` — claim an adjacent empty square
+   - `AMBUSH <codename>` — capture that agency's base, unless they defend it
+   - `DEFEND` — take your base back and protect it for the rest of the round
+     (sent as `DEFEND <your codename>`, the same length as an AMBUSH)
+3. The console reveals one encrypted order at a time. Everyone else has
+   **30 seconds** to crack it.
+4. The first team to crack it earns +1 and chooses, within 15 seconds:
+   **BLOCK** (cancel the order), **STEAL** (take 1 point from the sender; the order
+   still goes ahead) or, for an ambush, **CHANGE** (redirect it at a new target and
+   capture that base themselves). Uncracked orders stand.
+5. Points = 1 per square held + 1 extra per base held (a base is worth 2)
+   + 1 per crack + points stolen − points lost. Usually 4 rounds — highest score wins.
 
 Full rules, with diagrams, are built into the app itself (the **"How to play"**
 option on the landing screen) — nothing needs explaining verbally.
@@ -55,8 +62,13 @@ option on the landing screen) — nothing needs explaining verbally.
   ciphertext length never gives away who's being targeted
 - **Sender identity hidden** during the crack window, on both the console and every
   team's screen — only revealed once the clock stops and it's needed for scoring
-- **Live order validation** — students get instant feedback if an order doesn't
-  match a real square, a real codename, or the right format, before they can submit
+- **Three orders — MOVE, AMBUSH, DEFEND** — with live validation: students get
+  instant feedback if an order doesn't match a real square, a codename in play, or
+  the right format, before they can submit
+- **Cracker's choice** — the first team to crack a message picks BLOCK, STEAL or
+  CHANGE with radio buttons (no typing), with a 15-second countdown
+- **Order-entry timer** — teacher-set countdown; teams that miss it sit the round out
+- **Bases worth 2 points**, captured by AMBUSH and recovered by DEFEND
 - **A standalone Decoder Wheel** — a visual Caesar-cipher helper any student can
   use any time, independent of the live game, with a built-in cooldown so it can't
   be used to brute-force every shift within the crack window
@@ -117,13 +129,13 @@ another teacher — there's no toolchain to set up before you can even open the 
 
 ## Known limitations
 
-- Fixed 6×5 board, up to 6 teams, two order types (`MOVE`, `AMBUSH`) — deliberately
-  simple, matching a single-lesson format
+- Fixed 6×5 board, up to 6 teams, three order types (`MOVE`, `AMBUSH`, `DEFEND`) —
+  sized for a single-lesson format
 - One live game at a time per Firebase project — don't run two classes
   simultaneously on the same deployed link without resetting between them
-- No login system — team identity lives in the browser's local storage, and the
-  underlying database uses open ("test mode") rules, which is a reasonable
-  trade-off for a classroom activity but worth knowing about
+- No login system yet — team identity lives in the browser's local storage, and the
+  database rules allow anyone with the link to read and write game data. Teacher
+  sign-in, separate games per class and locked-down rules are planned next
 
 See `BUILD_GUIDE.md` for the full, detailed list and the reasoning behind each one.
 
