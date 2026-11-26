@@ -94,7 +94,18 @@ the game afterwards touches their account again.
 7. Copy that whole object — you'll need it in Step 3.
 
 **Security note:** test mode leaves the database open to anyone with the
-URL for 30 days, then Firebase locks it automatically. That's a reasonable
+URL for 30 days, then Firebase locks it automatically — **the game then stops
+working** ("permission denied"). To keep it running, replace the rules with:
+
+```json
+{
+  "rules": {
+    "games": { ".read": true, ".write": true }
+  }
+}
+```
+
+This doesn't expire, but anyone with the link can still change game data. That's a reasonable
 trade-off here — nothing sensitive is stored, just team names, colours,
 cipher shifts, and grid squares. If you're still using it after 30 days,
 open **Realtime Database → Rules** and extend the window (a minute's job).
@@ -219,30 +230,40 @@ If that works end-to-end, you're ready to run it live.
    team wants to personalise it.
 4. Every team's screen also shows a live **"How to play"** panel (goal and
    round flow) and a **Commands** reference sitting right next to the Setup
-   fields — full `MOVE`/`AMBUSH` syntax, so you shouldn't need to explain
+   fields — full `MOVE`/`AMBUSH`/`DEFEND` syntax, so you shouldn't need to explain
    the commands verbally at all.
 5. Your console's team list fills in live as teams join, colour and
    codename already attached — no action needed from you. An optional
    **Reshuffle colours** button is there if you want to remix before
    starting (lobby-only).
-6. Click **Start game** (enabled once at least 2 teams have joined).
-7. Each round: every team types one order into their free-text box
-   (e.g. `MOVE A1 A2` or `AMBUSH RUBY`). The box validates as they type —
-   a green ✓ or red ✗ message tells them immediately if the order doesn't
-   match a real square, a real codename, or the right format, and **Submit
-   is blocked** until it's valid. Once everyone's in, **Begin intercepts**
-   unlocks on the console.
-8. The console reveals one team's ciphertext at a time, in random order,
-   with a 30-second countdown. On every other team's screen, this appears
-   as a live **"Incoming message"** alert the instant it starts — they type
-   their decryption attempt there. After the clock stops, you **Resolve &
-   apply**. The map auto-suggests the outcome, but `MOVE` orders are now
-   validated first: the order must start from a square the team actually
-   controls and land on an adjacent square that isn't already enemy-held,
-   or you'll see an amber warning explaining why nothing was auto-applied.
-   Every square on the resolve screen is still click-to-override regardless.
-9. Repeat for all 4 rounds, or click **End game** in the top bar at any
-   point to stop early and show the final scoreboard.
+6. Optionally click **Start practice round** first: it plays like a real round
+   but nothing counts, and team screens say so. When it ends, click **End practice —
+   back to lobby**. Teams must choose a new cipher shift (the old one is refused,
+   because rivals may have cracked it); your team list shows who has re-keyed.
+   Then click **Start game** (enabled once at least 2 teams have joined).
+7. Each round: every team types one order (e.g. `MOVE A1 A2`, `AMBUSH RUBY`
+   or just `DEFEND`) before the **entry timer** runs out — set it under
+   **Game settings** (15–180 seconds, default 45). The box validates as they type,
+   and **Submit is blocked** until it's valid. **Begin intercepts** unlocks once
+   everyone is in, or when the timer runs out (late teams miss that round's order).
+8. The console reveals one team's ciphertext at a time, in random order, with a
+   30-second countdown. Every other team sees it as an **Incoming message** and
+   types their decryption attempt. Click **Stop clock** once everyone has guessed.
+9. If someone cracked it, the first cracker gets 15 seconds to choose on their own
+   screen: **BLOCK** (order cancelled), **STEAL** (take 1 point from the sender;
+   the order still goes ahead) or, for an AMBUSH, **CHANGE** (redirect it and
+   capture that base themselves). If they don't choose, BLOCK is applied; you can
+   also click **Skip choice (BLOCK)**.
+10. Click **Resolve & apply**. The outcome is pre-set from the cracker's choice and
+    the map shows the suggested result — `MOVE` must start from a square the team
+    controls and land on an adjacent empty square; `AMBUSH` captures the target's
+    base unless it was defended earlier that round; `DEFEND` returns the team's
+    base. Every square is still click-to-override.
+11. Repeat for all rounds, or click **End game** in the top bar at any point to
+    stop early and show the final scoreboard.
+
+Scoring: 1 point per square, 1 extra per base held (so a base is worth 2),
++1 per crack, plus points stolen and minus points lost.
 
 ---
 
@@ -263,7 +284,8 @@ If that works end-to-end, you're ready to run it live.
 - Orders are validated **before they can even be submitted**, not just at
   resolve time: the text box checks live as a team types, and `Submit` is
   blocked until it matches `MOVE <square> <square>` (two different, valid
-  board squares) or `AMBUSH <codename>` (one of the six real codenames).
+  board squares), `AMBUSH <codename>` (a codename in play, not your own) or
+  `DEFEND`.
   Because of that, the resolve-time `MOVE` checks below mostly catch
   *strategically* invalid moves (wrong owner, non-adjacent, enemy-held)
   rather than typos — those are stopped earlier.
@@ -292,14 +314,13 @@ If that works end-to-end, you're ready to run it live.
 
 ## 7. Known limitations (kept deliberately simple)
 
-- Fixed 6×5 grid (30 squares) with six team bases, up to six teams, two
-  order types (`MOVE`, `AMBUSH`) — matches the simplified game structure
-  this was built around, sized for a class of ~25–30 students in teams of 4.
-  Bigger boards or more commands (`DEFEND BASE`, `STEAL`, `CHANGE`) are a
-  bigger build — ask if you want those added back in.
+- Fixed 6×5 grid (30 squares) with six team bases, up to six teams, three
+  order types (`MOVE`, `AMBUSH`, `DEFEND`) plus the cracker's choice
+  (`BLOCK`, `STEAL`, `CHANGE`) — sized for a class of ~25–30 students in teams
+  of 4.
 - `AMBUSH` has no adjacency requirement by design — any team can strike any
-  other team's territory regardless of board position. `MOVE` is the only
-  order that's spatially constrained.
+  other team's base regardless of board position. `MOVE` is the only order
+  that's spatially constrained.
 - `AMBUSH` targets a fixed 4-letter **codename** rather than the colour word
   itself (RUBY=red, AQUA=blue, LIME=green, GOLD=yellow, PLUM=purple,
   RUST=orange) — every codename is the same length, so ciphertext length

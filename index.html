@@ -455,6 +455,9 @@
 
             .cell .base-mark {
                 font-size: 9px;
+                text-align: center;
+                line-height: 1.25;
+                padding: 0 3px;
                 letter-spacing: .06em;
                 text-transform: uppercase;
                 margin-top: 4px;
@@ -773,6 +776,7 @@
                     <div id="t-pending-submissions" class="muted" style="margin-top:8px; line-height:1.8;"></div>
                     <div class="divider"></div>
                     <button class="block" id="btn-begin-reveal" onclick="beginRevealPhase()" disabled>Begin intercepts</button>
+                    <p class="hint">Unlocks when every team has submitted, or when the entry timer runs out (teams that missed it sit this round out).</p>
                 </div>
 
                 <div class="panel hidden" id="teacher-reveal-panel">
@@ -792,6 +796,7 @@
                         <button class="ghost hidden" onclick="skipCrackerChoice()" id="btn-skip-choice">Skip choice (BLOCK)</button>
                         <button onclick="openResolvePanel()" id="btn-resolve" disabled>Resolve &amp; apply</button>
                     </div>
+                    <p class="hint">Stop the clock once everyone has guessed. If someone cracked it, they get 15 seconds to choose BLOCK, STEAL or CHANGE on their screen; Resolve unlocks when they choose (or BLOCK is applied automatically).</p>
                 </div>
 
                 <div class="panel hidden" id="teacher-resolve-panel">
@@ -805,6 +810,7 @@
                         <option value="change">CHANGE — (only when the cracker chose it)</option>
                     </select>
                     <div id="resolve-note"></div>
+                    <p class="hint">The outcome is pre-set from the cracker's choice and the map below shows the suggested result. Change the outcome or click squares only if something needs correcting.</p>
                     <div class="divider"></div>
                     <p class="muted" style="margin-bottom:8px;">Click a square to cycle its controller — use this to apply the effect, or fix anything:</p>
                     <div class="tactical" id="resolve-grid"></div>
@@ -817,7 +823,7 @@
                     <p class="muted" id="rend-caption">All orders for this round have been resolved.</p>
                     <div class="divider"></div>
                     <button class="block" id="btn-next-round" onclick="teacherNextRound()">Start round <span id="rend-next">2</span></button>
-                    <button class="block" id="btn-end-practice" onclick="teacherEndPractice()">Start the real game</button>
+                    <button class="block" id="btn-end-practice" onclick="teacherEndPractice()">End practice — back to lobby</button>
                 </div>
 
                 <div class="panel hidden" id="teacher-ended-panel">
@@ -872,6 +878,11 @@
         </div>
         <div class="wrap" style="max-width:640px;">
 
+            <div class="panel hidden" id="team-mode-banner" style="border-color:var(--amber);">
+                <h3 id="team-mode-title" style="color:var(--amber);">Practice round</h3>
+                <p class="hint" id="team-mode-text" style="margin-top:0;"></p>
+            </div>
+
             <div class="panel">
                 <h3>Setup</h3>
                 <label>Codename (auto-assigned — change any time)</label>
@@ -883,11 +894,13 @@
                     <button class="ghost" onclick="resetSetup()" id="btn-reset-setup" disabled>Reset</button>
                 </div>
                 <p class="hint" id="setup-status"></p>
+                <p class="hint">Your shift is your secret key: any team that works it out can read your orders. Your codename
+                    (shown on the legend below the map) is what rivals type to AMBUSH you.</p>
             </div>
 
             <div class="panel">
                 <h3>Tactical map</h3>
-                <p class="hint">Updates live as orders are resolved — carries over from round to round, it never resets between rounds.</p>
+                <p class="hint">Updates live as orders are resolved and carries over between rounds. Each square = 1 point; a base = 2 points to whoever holds it.</p>
                 <div class="tactical" id="team-grid"></div>
                 <div class="divider"></div>
                 <div id="team-legend" class="muted" style="font-size:12px; line-height:1.9;"></div>
@@ -895,7 +908,7 @@
 
             <div class="panel" id="team-incoming-panel">
                 <h3>Incoming message</h3>
-                <div id="incoming-idle" class="muted">No incoming intercept right now — this lights up the moment the console reveals a transmission.</div>
+                <div id="incoming-idle" class="muted">No incoming intercept right now. When the console reveals a transmission it appears here: you'll have 30 seconds to crack it. The first correct crack earns +1 and chooses BLOCK, STEAL or CHANGE.</div>
                 <div id="incoming-active" class="hidden">
                     <div class="center muted" style="margin-bottom:8px;">Intercept <strong id="tc-index"></strong> — sender hidden until resolved</div>
                     <div class="slip incoming-live" id="tc-slip">
@@ -907,6 +920,7 @@
                     <div id="tc-guess-area">
                         <label>Your decryption attempt</label>
                         <input type="text" id="tc-guess-input" placeholder="e.g. MOVE A1 A2" maxlength="40">
+                        <p class="hint" style="margin-top:4px;">Type the full decrypted order (e.g. AMBUSH RUBY or DEFEND LIME). One guess only — a wrong guess costs nothing.</p>
                         <button class="block" style="margin-top:10px;" onclick="submitCrack()">Submit decryption</button>
                         <p class="muted center" id="tc-guess-status" style="margin-top:8px;"></p>
                     </div>
@@ -951,7 +965,7 @@
                             <code class="cmd-move">MOVE A1 A2</code><br><span class="muted">→ claim an adjacent square</span><br><br>
                             <code class="cmd-ambush">AMBUSH RUBY</code><br><span class="muted">→ capture that agency's base (unless they defend)</span><br><br>
                             <code class="cmd-ambush">DEFEND</code><br><span class="muted">→ take back your base and protect it this round (your codename is added for you)</span><br><br>
-                            <span class="muted">One order per round. Squares A–F, 1–5.</span>
+                            <span class="muted">One order per round, no undo. Squares A–F, 1–5. MOVE only to an adjacent square (no diagonals) that isn't enemy-held.</span>
                         </p>
                     </div>
                 </div>
@@ -960,7 +974,7 @@
 
             <div class="panel hidden" id="team-roundend-panel2">
                 <h3>Round complete</h3>
-                <p class="muted">Waiting for the console to start the next round.</p>
+                <p class="muted">Waiting for the console to start the next round. Check the map and scoreboard — which bases are exposed? Whose shift could you work out from the messages you've seen?</p>
             </div>
 
             <div class="panel">
@@ -1032,16 +1046,23 @@
 
             <div class="panel">
                 <h3>How to play — step by step</h3>
-                <p class="hint" style="margin-top:0;">Goal: finish with the most points. <strong>Points</strong> = every square you
-                    control on the map, <strong>+1</strong> for every enemy order you successfully crack.</p>
+                <p class="hint" style="margin-top:0;">You are rival spy agencies fighting over a digital map. Every order
+                    you send is encrypted with your own Caesar shift — and every other agency is trying to crack it.</p>
+                <p class="hint">Goal: finish with the most points. <strong>1 point</strong> for every square you hold,
+                    <strong>2 points</strong> for every base you hold, <strong>+1</strong> for every enemy order you crack
+                    first, plus or minus any points stolen.</p>
             </div>
 
             <div class="panel">
                 <h3>Step 1 — Join &amp; set up</h3>
+                <p class="hint" style="margin-top:0;">Your teacher may start with a <strong>practice round</strong> first. It
+                    plays exactly like a real round but nothing counts. Afterwards you'll be asked to choose a
+                    <strong>new</strong> shift, because other teams may have cracked your practice one.</p>
                 <p class="hint">Click <strong>Join a team</strong> on the main menu — you'll get a random codename and colour
                     automatically, no choice needed. In the <strong>Setup</strong> panel, enter a Caesar cipher shift (any
                     number 1–25) and click <strong>Save</strong>. Do this <em>before</em> the teacher starts the game — your
-                    shift locks in the moment it does and can't be changed afterwards.</p>
+                    shift locks in the moment it does and can't be changed afterwards. Your <strong>codename</strong> (e.g. RUBY) is
+                    what rivals type to ambush you.</p>
             </div>
 
             <div class="panel">
@@ -1076,7 +1097,7 @@
 
             <div class="panel">
                 <h3>Step 3 — Write your order</h3>
-                <p class="hint">Each round, every team submits exactly <strong>one</strong> order. There are two kinds:</p>
+                <p class="hint">Each round, every team submits exactly <strong>one</strong> order. There are three kinds:</p>
 
                 <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">MOVE — claim a square</p>
                 <div class="anatomy-row">
@@ -1094,7 +1115,7 @@
                     </div>
                 </div>
 
-                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">AMBUSH — strike a rival agency</p>
+                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">AMBUSH — capture a rival's base</p>
                 <div class="anatomy-row">
                     <div class="anatomy-part">
                         <code class="cmd-ambush">AMBUSH</code>
@@ -1105,71 +1126,90 @@
                         <p class="hint">the target's 4-letter codename — not their colour word</p>
                     </div>
                 </div>
-                <p class="hint">Codenames (like RUBY, AQUA, LIME) are always 4 letters. Check the legend under your tactical
-                    map any time you need a reminder of which codename belongs to which team.</p>
+                <p class="hint">If it isn't cracked, you capture that agency's <strong>base</strong> (worth 2 points to you),
+                    whoever holds it now. It fails if they <strong>DEFEND</strong> earlier in the same round.</p>
+
+                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">DEFEND — protect your base</p>
+                <div class="anatomy-row">
+                    <div class="anatomy-part">
+                        <code class="cmd-ambush">DEFEND</code>
+                        <p class="hint">what you type</p>
+                    </div>
+                    <div class="anatomy-part">
+                        <code>DEFEND RUBY</code>
+                        <p class="hint">what's sent — your own codename is added for you</p>
+                    </div>
+                </div>
+                <p class="hint">If it isn't blocked, you get your base back (even if you lost it in an earlier round) and it
+                    can't be ambushed for the rest of the round.</p>
+                <p class="hint">Codenames (like RUBY, AQUA, LIME) are always 4 letters, so AMBUSH and DEFEND orders are the
+                    same length once encrypted. Check the legend under your tactical map for which codename belongs to
+                    which team.</p>
             </div>
 
             <div class="panel">
-                <h3>Step 4 — Submit, then wait</h3>
-                <p class="hint">Type your order, check the encrypted version that appears next to it, then click
-                    <strong>Submit encrypted order</strong>. There's no undo after that — double-check your squares and
-                    codename spelling before you submit.</p>
+                <h3>Step 4 — Submit before the timer runs out</h3>
+                <p class="hint">Type your order, check the encrypted version that appears under it, then click
+                    <strong>Submit encrypted order</strong>. Watch the countdown: if time runs out before you submit, you
+                    <strong>miss your order</strong> for that round (you can still crack other teams' messages). There's no
+                    undo after submitting — double-check squares and codename spelling first.</p>
             </div>
 
             <div class="panel">
                 <h3>Step 5 — The reveal &amp; crack window</h3>
-                <p class="hint">Once everyone has submitted, the round moves through these stages:</p>
+                <p class="hint">Once orders are in, the round moves through these stages:</p>
                 <div class="flow-row">
                     <div class="flow-step">
                         <div class="flow-num">1</div>
-                        <p class="hint">Everyone submits one encrypted order</p>
+                        <p class="hint">Console reveals one encrypted order at a time, in random order</p>
                     </div>
                     <div class="flow-arrow">→</div>
                     <div class="flow-step">
                         <div class="flow-num">2</div>
-                        <p class="hint">Console reveals one order at a time, in random order</p>
-                    </div>
-                    <div class="flow-arrow">→</div>
-                    <div class="flow-step">
-                        <div class="flow-num">3</div>
                         <p class="hint">Everyone else has 30 seconds to crack it</p>
                     </div>
                     <div class="flow-arrow">→</div>
                     <div class="flow-step">
-                        <div class="flow-num">4</div>
-                        <p class="hint">Teacher resolves the outcome</p>
+                        <div class="flow-num">3</div>
+                        <p class="hint">First correct crack earns +1 and chooses what happens</p>
                     </div>
                     <div class="flow-arrow">→</div>
                     <div class="flow-step">
-                        <div class="flow-num">5</div>
-                        <p class="hint">Repeat until the round ends</p>
+                        <div class="flow-num">4</div>
+                        <p class="hint">Teacher resolves it and the map updates</p>
                     </div>
                 </div>
-                <p class="hint">Watch the <strong>Incoming message</strong> panel on your screen — when it lights up and it
-                    isn't your own order, type your best guess of the plain text. Guess right and you score a point; guess
-                    wrong and nothing happens, no penalty.</p>
+                <p class="hint">Watch the <strong>Incoming message</strong> panel. When it lights up and it isn't your own
+                    order, type your best guess of the plain text. A wrong guess costs nothing.</p>
+                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">If you crack it first, choose one (15 seconds):</p>
+                <ul style="margin:6px 0 0; padding-left:18px; color:#e6e2d6; font-size:13px; line-height:1.9;">
+                    <li><strong>BLOCK</strong> — their order is cancelled.</li>
+                    <li><strong>STEAL</strong> — take 1 point from them. Their order still goes ahead.</li>
+                    <li><strong>CHANGE</strong> (ambushes only) — pick a new target and capture <em>that</em> base yourself.</li>
+                </ul>
+                <p class="hint">If you don't choose in time, BLOCK is chosen for you. If nobody cracks an order, it stands.</p>
             </div>
 
             <div class="panel">
                 <h3>Step 6 — Scoring &amp; next round</h3>
-                <p class="hint" style="margin-top:0;">Your score = every square you control + 1 point for every message
-                    you've successfully cracked. This repeats for several rounds, then the game ends and the highest score
-                    wins.</p>
+                <p class="hint" style="margin-top:0;">Your score = 1 point per square you hold, 1 extra for each base you
+                    hold (so a base is worth 2), +1 for each order you crack first, plus points you steal, minus points
+                    stolen from you. The game runs for several rounds (usually 4); highest score wins.</p>
             </div>
 
             <div class="panel" style="border-color:var(--red);">
                 <h3 style="color:var(--red);">Common mistakes to avoid</h3>
                 <ul style="margin:0; padding-left:18px; color:#e6e2d6; font-size:13px; line-height:1.9;">
-                    <li><code class="cmd-move">MOVE</code> must start from a square <strong>you already control</strong> —
-                        not just any square.</li>
+                    <li><code class="cmd-move">MOVE</code> must start from a square <strong>you already control</strong>,
+                        and can't land on an enemy square — only AMBUSH takes enemy territory.</li>
                     <li>Adjacent means <strong>up/down/left/right only</strong> — never diagonal, even if it looks close.</li>
-                    <li><code class="cmd-ambush">AMBUSH</code> targets the enemy's <strong>codename</strong> (e.g. RUBY), not
-                        their colour word (e.g. "Red").</li>
-                    <li>Set your cipher shift <strong>before</strong> the game starts — it locks in and can't be changed once
-                        it does.</li>
-                    <li>One order per round, with no undo — check squares and spelling before you hit submit.</li>
-                    <li>During the crack window, you're guessing <strong>someone else's</strong> message — you can't crack
-                        your own.</li>
+                    <li><code class="cmd-ambush">AMBUSH</code> targets a <strong>codename</strong> (e.g. RUBY), not a colour
+                        word (e.g. "Red"), and you can't ambush yourself.</li>
+                    <li>For <code class="cmd-ambush">DEFEND</code>, type just <strong>DEFEND</strong> — don't add a
+                        codename.</li>
+                    <li>Submit <strong>before the timer runs out</strong>, or you miss your order that round.</li>
+                    <li>Set your cipher shift <strong>before</strong> the game starts — it locks in for the whole game.</li>
+                    <li>When you crack a message, decide fast — you have 15 seconds before BLOCK is chosen for you.</li>
                 </ul>
             </div>
 
@@ -1625,7 +1665,10 @@
         function teamColour(g, id) { return g.teams && g.teams[id] && g.teams[id].colour; }
 
         /** Main teacher-console render function: draws the lobby/round/scoreboard UI for the current game phase (lobby, submitting, revealing, roundend, ended). */
+        let practiceRunning = false; // mirrors g.practice for the top-bar End game button
+        let recoveringReveal = null; // guards the stranded-reveal recovery so it only fires once per intercept
         function renderTeacher(g) {
+            practiceRunning = !!g.practice && g.phase !== 'lobby' && g.phase !== 'ended';
             document.getElementById('phase-pill').textContent = g.practice && g.phase !== 'lobby' && g.phase !== 'ended' ? 'PRACTICE' : g.phase.toUpperCase();
             document.getElementById('phase-pill').classList.toggle('live', g.phase !== 'lobby' && g.phase !== 'ended');
             document.getElementById('btn-end-game-top').disabled = (g.phase === 'lobby' || g.phase === 'ended');
@@ -1651,7 +1694,8 @@
                 listEl.innerHTML = ids.map(id => {
                     const t = g.teams[id];
                     const swatch = t.colour ? `<span class="team-swatch t-${t.colour}"></span>${cap(t.colour)} · ${CODE_OF[t.colour]}` : `<span class="status-pill unassigned">unassigned</span>`;
-                    return `<div class="team-list-row"><span>${escapeHtml(t.name)}</span><span>${swatch}</span></div>`;
+                    const rekeyTag = g.rekey ? (t.setupSaved ? ' <span class="txt-green">· new shift saved</span>' : ' <span class="txt-red">· choosing new shift</span>') : '';
+                    return `<div class="team-list-row"><span>${escapeHtml(t.name)}${rekeyTag}</span><span>${swatch}</span></div>`;
                 }).join('');
             }
             const allHaveColour = ids.length > 0 && ids.every(id => g.teams[id].colour);
@@ -1685,11 +1729,16 @@
             if (g.phase === 'revealing' && g.currentReveal && !teacherResolvePanelOpen) {
                 renderRevealPanel(g);
             }
+            // Recover if the console stopped between advancing and publishing the next intercept.
+            if (g.phase === 'revealing' && !g.currentReveal && !teacherResolvePanelOpen) {
+                const nextTeam = (g.revealOrder || [])[g.revealIdx];
+                if (nextTeam && recoveringReveal !== g.revealIdx) { recoveringReveal = g.revealIdx; startReveal(nextTeam); }
+            }
 
             if (g.phase === 'roundend') {
                 if (g.practice) {
                     document.getElementById('rend-heading').textContent = 'Practice round complete';
-                    document.getElementById('rend-caption').textContent = 'That was just a demo — nothing here counted. Ready to start the real thing?';
+                    document.getElementById('rend-caption').textContent = 'That was just a demo — nothing here counted. Ending practice returns everyone to the lobby to choose a new cipher shift (others may have cracked theirs), then you start the real game.';
                     document.getElementById('btn-next-round').classList.add('hidden');
                     document.getElementById('btn-end-practice').classList.remove('hidden');
                 } else {
@@ -1701,7 +1750,7 @@
                 }
             }
 
-            renderGridInto('teacher-grid', g.grid);
+            renderGridInto('teacher-grid', g.grid || {}, false, g);
             renderScoreboardInto('teacher-scoreboard', g);
             renderLog('teacher-log', g.log);
             if (g.phase === 'ended') renderFinal('final-ranking', g);
@@ -1794,7 +1843,7 @@
                 const g = snap.val();
                 const grid = baseGridFor(g.teams || {});
                 gameRef.update({
-                    phase: 'submitting', round: 1, practice: false, grid, submissions: {}, revealOrder: [], revealIdx: -1,
+                    phase: 'submitting', round: 1, practice: false, rekey: false, grid, submissions: {}, revealOrder: [], revealIdx: -1,
                     currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g), log: [logEntry(g, 'Game started. Round 1 begins.')]
                 });
             });
@@ -1818,12 +1867,15 @@
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const teams = { ...g.teams };
-                Object.keys(teams).forEach(id => { teams[id] = { ...teams[id], score: 0, stolen: 0, lost: 0 }; });
+                // Wipe practice points and ask every team for a new shift: rivals may have cracked the practice one.
+                Object.keys(teams).forEach(id => {
+                    teams[id] = { ...teams[id], score: 0, stolen: 0, lost: 0, practiceShift: teams[id].shift, setupSaved: false };
+                });
                 const grid = baseGridFor(teams);
                 gameRef.update({
-                    phase: 'submitting', round: 1, practice: false, teams, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, defended: {}, ...entryWindow(g),
-                    log: [logEntry(g, 'Practice round finished. The real game starts now — scores and territory reset.')]
+                    phase: 'lobby', round: 1, practice: false, rekey: true, teams, grid, submissions: {}, revealOrder: [], revealIdx: -1,
+                    currentReveal: null, crackAttempts: {}, defended: {}, entryClosed: false,
+                    log: [logEntry(g, 'Practice round finished — scores and territory reset. Teams: choose a new cipher shift, then the console starts the real game.')]
                 });
             });
         }
@@ -1890,6 +1942,17 @@
         function creditedCracker(g) {
             const cr = g.currentReveal || {};
             return (cr.choice && cr.choice.by) || chooseCrackingWinner(g.crackAttempts || {});
+        }
+
+        /** One-line status of a colour's base for the map legend, e.g. "base A1, captured by AQUA". */
+        function baseStatus(g, colour) {
+            const sq = BASE_OF[colour];
+            if (!sq) return '';
+            const holder = (g.grid || {})[sq];
+            if ((g.defended || {})[colour] === g.round && holder === colour) return `base ${sq}, defended this round`;
+            if (!holder) return `base ${sq}, empty`;
+            if (holder !== colour) return `base ${sq}, captured by ${CODE_OF[holder]}`;
+            return `base ${sq}`;
         }
 
         /** Colours currently held by a joined team. */
@@ -2073,15 +2136,19 @@
         }
 
         /** Draws the 6x5 board grid into the given container element, colouring each square by its current owner; squares are clickable to cycle owner when `editable` is true. */
-        function renderGridInto(elId, grid, editable) {
+        function renderGridInto(elId, grid, editable, g) {
             const el = document.getElementById(elId);
+            const defended = (g && g.defended) || {};
             el.innerHTML = SQUARES.map(sq => {
                 const owner = (editable && pendingGrid ? pendingGrid[sq] : grid[sq]);
                 const base = BASES[sq];
+                const captured = base && owner && owner !== base;
+                const isDefended = base && g && defended[base] === g.round && owner === base;
+                const baseLabel = !base ? '' : (captured ? `${CODE_OF[base]} base<br>taken by ${CODE_OF[owner]}` : `${CODE_OF[base]} base${isDefended ? '<br>defended' : ''}`);
                 return `<div class="cell ${owner ? 'owned-' + owner : ''}" ${editable ? `onclick="cycleOwner('${sq}')"` : ''} data-sq="${sq}">
           <span class="coord">${sq}</span>
           ${owner ? `<span class="team-swatch t-${owner}"></span>` : ''}
-          ${base ? `<span class="base-mark">${CODE_OF[base]} base</span>` : ''}
+          ${base ? `<span class="base-mark">${baseLabel}</span>` : ''}
         </div>`;
             }).join('');
         }
@@ -2163,6 +2230,7 @@
                 const g = snap.val();
                 const el = document.getElementById('t-entry-timer');
                 if (!g || g.phase !== 'submitting') { clearInterval(entryTimerHandle); entryTimerHandle = null; return; }
+                if (!g.entryEnd && !g.entryClosed) { gameRef.update(entryWindow(g)); return; } // game started before the timer existed
                 const left = Math.max(0, Math.ceil(((g.entryEnd || 0) - Date.now()) / 1000));
                 if (el) { el.textContent = g.entryClosed ? '0' : left; el.classList.toggle('danger', left <= 10); }
                 if (!g.entryClosed && g.entryEnd && left <= 0) {
@@ -2188,6 +2256,10 @@
         }
         /** Ends the game after teacher confirmation, moving to the final results screen. */
         function teacherEndGame() {
+            if (practiceRunning) {
+                if (confirm('This is the practice round. End practice and return everyone to the lobby? Nothing from practice counts.')) teacherEndPractice();
+                return;
+            }
             if (!confirm('End the game now and show final results?')) return;
             gameRef.once('value').then(snap => {
                 const g = snap.val();
@@ -2271,6 +2343,8 @@
                     return;
                 }
                 const teams = g.teams || {};
+                const me = teams[myTeamId] || {};
+                if (g.rekey && me.practiceShift === shiftVal) { statusEl.textContent = 'Pick a different shift from your practice round — rivals may have cracked that one.'; return; }
                 const taken = Object.keys(teams).some(id => id !== myTeamId && (teams[id].name || '').toLowerCase() === name.toLowerCase());
                 if (taken) { statusEl.textContent = 'That codename is already taken — pick another.'; return; }
 
@@ -2354,6 +2428,20 @@
             const shiftInput = document.getElementById('shift-input');
             const gameStarted = g.phase !== 'lobby';
             const saved = !!t.setupSaved;
+            // Practice / re-key banner
+            const banner = document.getElementById('team-mode-banner');
+            const inPractice = !!g.practice && g.phase !== 'lobby' && g.phase !== 'ended';
+            const rekeying = !!g.rekey && g.phase === 'lobby';
+            banner.classList.toggle('hidden', !inPractice && !rekeying);
+            if (inPractice) {
+                document.getElementById('team-mode-title').textContent = 'Practice round — this doesn\'t count';
+                document.getElementById('team-mode-text').textContent = 'Try out ordering, cracking and choosing. Scores and the map reset when practice ends.';
+            } else if (rekeying) {
+                document.getElementById('team-mode-title').textContent = saved ? 'New shift saved — ready for the real game' : 'Practice over — choose a NEW cipher shift';
+                document.getElementById('team-mode-text').textContent = saved
+                    ? 'Wait for the console to start the real game.'
+                    : 'Other teams may have cracked your practice shift. Enter a different shift below and click Save before the real game starts.';
+            }
             if (document.activeElement !== shiftInput) shiftInput.value = (t.shift != null ? t.shift : '');
             nameInput.disabled = gameStarted;
             shiftInput.disabled = gameStarted;
@@ -2363,10 +2451,10 @@
                 ? 'The game has already started — setup is locked.'
                 : (saved ? 'Saved. Click Reset if you need to change anything.' : 'Set your codename and cipher shift, then click Save.');
 
-            renderGridInto('team-grid', g.grid || {});
+            renderGridInto('team-grid', g.grid || {}, false, g);
             const teams = g.teams || {};
             const legendRows = Object.keys(teams).filter(tid => teams[tid].colour).map(tid =>
-                `<span class="team-swatch t-${teams[tid].colour}"></span>${escapeHtml(teams[tid].name)} — codename <strong>${CODE_OF[teams[tid].colour]}</strong>${tid === id ? ' <span class="muted">(you)</span>' : ''}`
+                `<span class="team-swatch t-${teams[tid].colour}"></span>${escapeHtml(teams[tid].name)} — codename <strong>${CODE_OF[teams[tid].colour]}</strong>${tid === id ? ' <span class="muted">(you)</span>' : ''} <span class="muted">· ${baseStatus(g, teams[tid].colour)}</span>`
             );
             document.getElementById('team-legend').innerHTML = legendRows.join('<br>') || 'No agencies assigned a colour yet.';
 
