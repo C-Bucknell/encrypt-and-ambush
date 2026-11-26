@@ -13,7 +13,7 @@ function loadEngine() {
   assert.ok(start !== -1 && end !== -1, 'order engine block should be extractable from index.html');
   // `const` declarations don't attach to the sandbox, so expose what the tests need explicitly.
   const source = html.slice(start, end) + `
-    ;this.api = { BASES, BASE_OF, CODE_OF, normalizeOrder, expandOrder, parseOrder, validateOrderText, applyOrder };`;
+    ;this.api = { BASES, BASE_OF, CODE_OF, normalizeOrder, expandOrder, parseOrder, validateOrderText, applyOrder, crackerOptions, resolveOutcome, scoreChanges, teamTotal };`;
   const context = {};
   vm.createContext(context);
   vm.runInContext(source, context);
@@ -99,4 +99,64 @@ test('applyOrder never mutates the grid it is given', () => {
   const g = startGrid();
   E.applyOrder(g, 'AMBUSH AQUA', ctx('red'));
   assert.deepEqual({ ...g }, startGrid());
+});
+
+// ---------------- Cracker's choice ----------------
+const ALL = ['red', 'blue', 'green', 'yellow'];
+
+test('crackerOptions: CHANGE and targets only for an AMBUSH', () => {
+  const move = E.crackerOptions('MOVE A1 A2', 'blue', ALL);
+  assert.deepEqual([...move.actions], ['block', 'steal']);
+  assert.equal(move.targets.length, 0);
+  const amb = E.crackerOptions('AMBUSH LIME', 'blue', ALL); // red's ambush on green, cracked by blue
+  assert.deepEqual([...amb.actions], ['block', 'steal', 'change']);
+  assert.deepEqual([...amb.targets], ['red', 'yellow'], 'never the cracker or the original target');
+});
+
+test('resolveOutcome: BLOCK leaves the board alone', () => {
+  const r = E.resolveOutcome(startGrid(), 'AMBUSH AQUA', 'block', ctx('red', { crackerColour: 'green' }));
+  assert.deepEqual({ ...r.grid }, startGrid());
+});
+
+test('resolveOutcome: STEAL still lets the sender\'s order go ahead', () => {
+  const r = E.resolveOutcome(startGrid(), 'AMBUSH AQUA', 'steal', ctx('red', { crackerColour: 'green' }));
+  assert.equal(r.valid, true);
+  assert.equal(r.grid.A3, 'red');
+});
+
+test('AMBUSH on a codename no team is using is rejected', () => {
+  assert.equal(E.validateOrderText('AMBUSH PLUM', 'red', ['red', 'blue']).valid, false);
+  assert.equal(E.validateOrderText('AMBUSH AQUA', 'red', ['red', 'blue']).valid, true);
+  const r = E.applyOrder(startGrid(), 'AMBUSH PLUM', ctx('red', { joined: ['red', 'blue'] }));
+  assert.equal(r.valid, false);
+  assert.equal(r.grid.F3, undefined, 'vacant base stays empty');
+});
+
+test('resolveOutcome: CHANGE captures the new target base for the cracker', () => {
+  // red ambushed blue; green cracked it and redirected it at yellow
+  const r = E.resolveOutcome(startGrid(), 'AMBUSH AQUA', 'change', ctx('red', { crackerColour: 'green', changeTarget: 'yellow' }));
+  assert.equal(r.valid, true);
+  assert.equal(r.grid.F1, 'green');
+  assert.equal(r.grid.A3, 'blue', 'original target untouched');
+});
+
+test('resolveOutcome: CHANGE fails against a defended base', () => {
+  const r = E.resolveOutcome(startGrid(), 'AMBUSH AQUA', 'change',
+    ctx('red', { crackerColour: 'green', changeTarget: 'yellow', defended: { yellow: 1 }, round: 1 }));
+  assert.equal(r.valid, false);
+  assert.equal(r.grid.F1, 'yellow');
+});
+
+test('scoreChanges: +1 interception always, STEAL moves one more point', () => {
+  assert.deepEqual({ ...E.scoreChanges('block', true) }, { interception: 1, stolen: 0, lost: 0 });
+  assert.deepEqual({ ...E.scoreChanges('steal', true) }, { interception: 1, stolen: 1, lost: 1 });
+  assert.deepEqual({ ...E.scoreChanges('change', true) }, { interception: 1, stolen: 0, lost: 0 });
+  assert.deepEqual({ ...E.scoreChanges('stand', true) }, { interception: 0, stolen: 0, lost: 0 });
+  assert.deepEqual({ ...E.scoreChanges('steal', false) }, { interception: 0, stolen: 0, lost: 0 });
+});
+
+test('teamTotal: squares + interceptions + stolen - lost', () => {
+  const grid = { A1: 'red', A2: 'red', A3: 'blue' };
+  assert.equal(E.teamTotal({ colour: 'red', score: 2, stolen: 1, lost: 0 }, grid), 5);
+  assert.equal(E.teamTotal({ colour: 'blue', score: 0, lost: 1 }, grid), 0);
 });
