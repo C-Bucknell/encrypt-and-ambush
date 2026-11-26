@@ -699,6 +699,37 @@
             }
             .choice-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; text-transform: none; letter-spacing: 0; font-size: 14px; }
         .choice-row input { width: auto; margin: 0; }
+
+        /* ---------- Teacher console: fit a 1280×720 projector without scrolling ---------- */
+        #screen-teacher .topbar { padding: 8px 14px; gap: 10px; flex-wrap: nowrap; }
+        #screen-teacher .bar-left, #screen-teacher .bar-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; min-width: 0; }
+        #screen-teacher .topbar button.small, #screen-teacher .console-menu summary { padding: 5px 9px; font-size: 11.5px; white-space: nowrap; }
+        #screen-teacher .status-pill { padding: 3px 8px; font-size: 10.5px; white-space: nowrap; }
+        #screen-teacher .wrap { max-width: 1280px; padding: 12px 14px; }
+        #screen-teacher .grid2 { gap: 12px; grid-template-columns: 1fr 1fr; }
+        #screen-teacher .panel { padding: 12px 14px; }
+        #screen-teacher .grid2 > div { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+        #screen-teacher .grid2 > div > .panel + .panel { margin-top: 0; }
+        #screen-teacher #resolve-grid { max-width: 280px; }
+        #screen-teacher .panel h3 { margin-bottom: 8px; }
+        #screen-teacher .timer { font-size: 36px; margin: 4px 0 0; }
+        #screen-teacher .tactical { max-width: 340px; gap: 4px; }
+        #screen-teacher .log { max-height: 140px; }
+        #screen-teacher .hint { font-size: 11.5px; margin-top: 6px; }
+        #screen-teacher .slip { padding: 10px 14px; }
+        #screen-teacher details > summary { cursor: pointer; list-style: none; }
+        #screen-teacher details > summary::-webkit-details-marker { display: none; }
+        #screen-teacher details.panel > summary h3 { margin-bottom: 0; }
+        .console-menu { position: relative; }
+        .console-menu summary { font-family: 'Space Grotesk', sans-serif; font-weight: 600; border: 1px solid var(--amber); color: var(--amber); border-radius: var(--radius); }
+        .console-menu-list { position: absolute; right: 0; top: calc(100% + 6px); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px; display: flex; flex-direction: column; gap: 6px; z-index: 30; min-width: 150px; }
+        .join-code-box { text-align: center; padding: 6px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+        .join-code-big { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 64px; letter-spacing: .25em; color: var(--amber); line-height: 1.1; margin-top: 4px; }
+        @media (max-width: 1000px) {
+            #screen-teacher .topbar { flex-wrap: wrap; }
+            #screen-teacher .bar-actions { flex-wrap: wrap; }
+        }
+        @media (max-width: 860px) { #screen-teacher .grid2 { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -865,33 +896,34 @@
     <!-- ================= TEACHER ================= -->
     <div id="screen-teacher" class="hidden">
         <div class="topbar">
-            <div class="brand-mini">ENCRYPT<span class="strike">&amp;</span>AMBUSH <span class="muted" style="font-weight:400;font-size:11px;">/ CONSOLE</span></div>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div class="bar-left">
+                <div class="brand-mini">E<span class="strike">&amp;</span>A <span class="muted" style="font-weight:400;font-size:11px;">/ CONSOLE</span></div>
                 <span class="status-pill live" id="join-code-pill" title="Students enter this code to join">CODE ----</span>
                 <span id="game-status-pill" class="status-pill">OPEN</span>
                 <span id="phase-pill" class="status-pill">LOBBY</span>
+            </div>
+            <div class="bar-actions">
                 <button class="ghost small" id="btn-lock-game" onclick="toggleLock()">Lock joining</button>
                 <button class="ghost small" id="btn-close-game" onclick="toggleClosed()">Close game</button>
-                <button class="ghost small" onclick="goDecoder()">Decoder wheel</button>
-                <button class="ghost small" onclick="openTeacherHome()">My games</button>
                 <button class="danger small" id="btn-end-game-top" onclick="teacherEndGame()" disabled>End game</button>
-                <button class="ghost small" onclick="confirmReset()">Reset game</button>
+                <details class="console-menu">
+                    <summary class="small">Menu ▾</summary>
+                    <div class="console-menu-list">
+                        <button class="ghost small" onclick="closeConsoleMenu(); confirmReset()">Reset game</button>
+                        <button class="ghost small" onclick="closeConsoleMenu(); goDecoder()">Decoder wheel</button>
+                        <button class="ghost small" onclick="closeConsoleMenu(); openTeacherHome()">My games</button>
+                        <button class="ghost small hidden" id="btn-console-admin" onclick="closeConsoleMenu(); openAdmin()">Admin</button>
+                    </div>
+                </details>
             </div>
         </div>
         <div class="wrap grid2">
             <div>
-                <div class="panel">
-                    <h3>Game settings</h3>
-                    <label>Number of rounds</label>
-                    <input type="number" id="teacher-max-rounds" min="1" max="20" value="4" onchange="saveMaxRounds()">
-                    <p class="hint" id="teacher-rounds-status">Current round limit: 4</p>
-                    <p class="hint">Changing this updates the game end condition immediately — the final round is whatever the current total is set to.</p>
-                    <label style="margin-top:12px;">Time to enter orders (seconds)</label>
-                    <input type="number" id="teacher-entry-seconds" min="15" max="180" value="45" onchange="saveEntrySeconds()">
-                    <p class="hint">Teams that haven't submitted when this runs out miss their order for that round. Applies from the next round.</p>
-                </div>
-
                 <div class="panel" id="teacher-lobby-panel">
+                    <div class="join-code-box">
+                        <div class="muted">Students: go to <strong id="join-site"></strong> → <strong>Join a team</strong> → enter</div>
+                        <div class="join-code-big" id="join-code-big">----</div>
+                    </div>
                     <h3>Agencies checked in</h3>
                     <div id="teacher-team-list" class="muted">No teams have joined yet.</div>
                     <p class="hint">Names and colours are assigned automatically the moment each team joins — no action needed from you.</p>
@@ -962,6 +994,16 @@
                     <h3>Final results</h3>
                     <div id="final-ranking"></div>
                 </div>
+                <details class="panel settings-panel" id="teacher-settings">
+                    <summary><h3 style="display:inline;">Game settings</h3> <span class="muted" id="settings-summary" style="font-size:12px;"></span></summary>
+                    <label style="margin-top:10px;">Number of rounds</label>
+                    <input type="number" id="teacher-max-rounds" min="1" max="20" value="4" onchange="saveMaxRounds()">
+                    <p class="hint" id="teacher-rounds-status">Current round limit: 4</p>
+                    <p class="hint">Changing this updates the game end condition immediately — the final round is whatever the current total is set to.</p>
+                    <label style="margin-top:12px;">Time to enter orders (seconds)</label>
+                    <input type="number" id="teacher-entry-seconds" min="15" max="180" value="45" onchange="saveEntrySeconds()">
+                    <p class="hint">Teams that haven't submitted when this runs out miss their order for that round. Applies from the next round.</p>
+                </details>
             </div>
 
             <div>
@@ -973,10 +1015,10 @@
                     <h3>Scoreboard</h3>
                     <div id="teacher-scoreboard"></div>
                 </div>
-                <div class="panel">
-                    <h3>Field log</h3>
-                    <div class="log" id="teacher-log"></div>
-                </div>
+                <details class="panel" id="teacher-log-panel">
+                    <summary><h3 style="display:inline;">Field log</h3> <span class="muted" style="font-size:12px;">(click to show)</span></summary>
+                    <div class="log" id="teacher-log" style="margin-top:8px;"></div>
+                </details>
             </div>
         </div>
     </div>
@@ -2614,8 +2656,14 @@
             show('screen-teacher');
             initTeacherView();
         }
+        function closeConsoleMenu() { document.querySelectorAll('.console-menu').forEach(d => d.removeAttribute('open')); }
+        document.addEventListener('click', e => { if (!e.target.closest('.console-menu')) closeConsoleMenu(); });
         function renderGameControls(g) {
             document.getElementById('join-code-pill').textContent = 'CODE ' + (g.code || gameCode);
+            document.getElementById('join-code-big').textContent = g.code || gameCode;
+            document.getElementById('join-site').textContent = location.host || 'encrypt-and-ambush.web.app';
+            document.getElementById('btn-console-admin').classList.toggle('hidden', !(access && access.isAdmin));
+            document.getElementById('settings-summary').textContent = `· ${g.maxRounds || 4} rounds · ${clampEntrySeconds(g.entrySeconds)} s to enter orders`;
             const st = g.status || 'open';
             const pill = document.getElementById('game-status-pill');
             pill.textContent = st === 'open' ? 'JOINING OPEN' : (st === 'locked' ? 'JOINING LOCKED' : 'CLOSED');
@@ -2679,6 +2727,7 @@
         let adminRefs = [];
         function openAdmin() {
             if (!access || !access.isAdmin) return;
+            detachTeacherConsole();
             if (myGamesRef) { myGamesRef.off(); myGamesRef = null; }
             adminRefs.forEach(r => r.off()); adminRefs = [];
             document.getElementById('admin-role-pill').textContent = access.isPrimary ? 'PRIMARY OWNER' : (access.isOwner ? 'OWNER' : 'ADMIN');
