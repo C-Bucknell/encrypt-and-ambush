@@ -13,7 +13,7 @@ function loadEngine() {
   assert.ok(start !== -1 && end !== -1, 'order engine block should be extractable from index.html');
   // `const` declarations don't attach to the sandbox, so expose what the tests need explicitly.
   const source = html.slice(start, end) + `
-    ;this.api = { BASES, BASE_OF, CODE_OF, normalizeOrder, expandOrder, parseOrder, validateOrderText, applyOrder, crackerOptions, resolveOutcome, scoreChanges, teamTotal };`;
+    ;this.api = { BASES, BASE_OF, CODE_OF, normalizeOrder, expandOrder, parseOrder, validateOrderText, applyOrder, crackerOptions, resolveOutcome, scoreChanges, teamTotal, basesHeld, clampEntrySeconds, entryWindow };`;
   const context = {};
   vm.createContext(context);
   vm.runInContext(source, context);
@@ -155,8 +155,25 @@ test('scoreChanges: +1 interception always, STEAL moves one more point', () => {
   assert.deepEqual({ ...E.scoreChanges('steal', false) }, { interception: 0, stolen: 0, lost: 0 });
 });
 
-test('teamTotal: squares + interceptions + stolen - lost', () => {
-  const grid = { A1: 'red', A2: 'red', A3: 'blue' };
-  assert.equal(E.teamTotal({ colour: 'red', score: 2, stolen: 1, lost: 0 }, grid), 5);
-  assert.equal(E.teamTotal({ colour: 'blue', score: 0, lost: 1 }, grid), 0);
+test('teamTotal: squares (bases worth 2) + interceptions + stolen - lost', () => {
+  const grid = { A1: 'red', A2: 'red', A3: 'blue' }; // A1 = red base, A3 = blue base
+  assert.equal(E.teamTotal({ colour: 'red', score: 2, stolen: 1, lost: 0 }, grid), 6); // 2 sq + 1 base bonus + 2 + 1
+  assert.equal(E.teamTotal({ colour: 'blue', score: 0, lost: 1 }, grid), 1);          // 1 sq + 1 base bonus - 1
+});
+
+test('a captured base is worth 2 to whoever holds it', () => {
+  const grid = { A1: 'red', A3: 'red' }; // red holds its own base and blue's
+  assert.equal(E.basesHeld('red', grid), 2);
+  assert.equal(E.teamTotal({ colour: 'red' }, grid), 4);
+  assert.equal(E.teamTotal({ colour: 'blue' }, grid), 0);
+});
+
+test('entry timer setting is clamped and opens a window', () => {
+  assert.equal(E.clampEntrySeconds('45'), 45);
+  assert.equal(E.clampEntrySeconds(5), 15);
+  assert.equal(E.clampEntrySeconds(999), 180);
+  assert.equal(E.clampEntrySeconds('abc'), 45);
+  const w = E.entryWindow({ entrySeconds: 30 }, 1000);
+  assert.equal(w.entryEnd, 31000);
+  assert.equal(w.entryClosed, false);
 });
