@@ -348,7 +348,7 @@ Scoring: 1 point per square, 1 extra per base held (so a base is worth 2),
    shows) and **Anonymous** (used by students).
 2. **Primary owner:** sign in once with your Microsoft account. The pending screen
    shows your **Account ID**. Put it in two places:
-   - `database.rules.json` — replace `__PRIMARY_OWNER_UID__`
+   - `database.rules.json` — the primary owner's Account ID (already set to Chris's)
    - Realtime Database → Data → add `config/primaryOwner` with your Account ID as the value
 3. **Publish the rules:** paste `database.rules.json` into Realtime Database → Rules and
    click Publish (or run `firebase deploy --only database`). The GitHub Action only
