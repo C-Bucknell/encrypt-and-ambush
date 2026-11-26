@@ -925,7 +925,8 @@
                     <div>
                         <p class="hint" style="margin-top:0; line-height:2;">
                             <code class="cmd-move">MOVE A1 A2</code><br><span class="muted">→ claim an adjacent square</span><br><br>
-                            <code class="cmd-ambush">AMBUSH RUBY</code><br><span class="muted">→ strip any enemy square</span><br><br>
+                            <code class="cmd-ambush">AMBUSH RUBY</code><br><span class="muted">→ capture that agency's base (unless they defend)</span><br><br>
+                            <code class="cmd-ambush">DEFEND</code><br><span class="muted">→ take back your base and protect it this round (your codename is added for you)</span><br><br>
                             <span class="muted">One order per round. Squares A–F, 1–5.</span>
                         </p>
                     </div>
@@ -1199,6 +1200,12 @@
         const CODE_LIST = Object.values(CODE_OF);
         // Matches a full "AMBUSH <CODENAME>" order once normalised to uppercase.
         const AMBUSH_RE = new RegExp('^AMBUSH (' + CODE_LIST.join('|') + ')$');
+        // Matches a transmitted "DEFEND <CODENAME>" order. Teams only type "DEFEND" — the app appends
+        // their own codename so DEFEND is the same length as AMBUSH (11 characters) once encrypted.
+        const DEFEND_RE = new RegExp('^DEFEND (' + CODE_LIST.join('|') + ')$');
+        // Reverse lookup: colour -> its base square (e.g. red -> A1).
+        const BASE_OF = {};
+        Object.keys(BASES).forEach(sq => { BASE_OF[BASES[sq]] = sq; });
         // Adjacency map: for every board square, the orthogonally neighbouring squares
         // it can legally MOVE to/from (used for suggesting/validating moves).
         const ADJ = {};
@@ -1212,6 +1219,135 @@
             if (row < ROWS.length) neighbours.push(col + (row + 1));
             ADJ[sq] = neighbours;
         });
+
+        /* ---------------- ORDER ENGINE ----------------
+           Pure functions (no Firebase, no DOM) that parse, validate and apply every order type.
+           Kept together so each command is one entry in COMMANDS and can be unit-tested
+           (see order-engine.test.js). */
+
+        /** Uppercases and collapses whitespace so orders compare equal regardless of spacing/case. */
+        function normalizeOrder(raw) { return String(raw || '').trim().toUpperCase().replace(/\s+/g, ' '); }
+
+        /** Capitalises the first letter of a colour name for messages. */
+        function capWord(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+        /** Turns what a team typed into what is actually encrypted and sent: a bare "DEFEND" gets the team's own codename appended. */
+        function expandOrder(raw, myColour) {
+            const text = normalizeOrder(raw);
+            if (text === 'DEFEND' && CODE_OF[myColour]) return 'DEFEND ' + CODE_OF[myColour];
+            return text;
+        }
+
+        /**
+         * One entry per order type. Each has:
+         *  - parse(text)   -> order object or null
+         *  - check(order, myColour) -> null if OK, or an error message (typing-time checks only)
+         *  - apply(grid, order, ctx) -> { grid, valid, reason, defended? }
+         *    ctx = { colour: sender's colour, defended: { colour: round }, round }
+         */
+        const COMMANDS = {
+            MOVE: {
+                example: 'MOVE A1 A2',
+                parse(text) {
+                    const m = text.match(/^MOVE ([A-F][1-5]) ([A-F][1-5])$/);
+                    return m ? { type: 'MOVE', from: m[1], to: m[2] } : null;
+                },
+                check(order) {
+                    return order.from === order.to ? '✗ From and to squares must be different.' : null;
+                },
+                apply(grid, order, ctx) {
+                    const g = { ...grid };
+                    const me = ctx.colour;
+                    if (g[order.from] !== me) return { grid: g, valid: false, reason: `${capWord(me)} doesn't currently control ${order.from}, so this move can't be auto-applied.` };
+                    if (!(ADJ[order.from] || []).includes(order.to)) return { grid: g, valid: false, reason: `${order.to} isn't adjacent to ${order.from} (only up/down/left/right count), so this move can't be auto-applied.` };
+                    if (g[order.to] && g[order.to] !== me) return { grid: g, valid: false, reason: `${order.to} is already held by another agency — MOVE can't capture it, only AMBUSH can take a base.` };
+                    g[order.to] = me;
+                    return { grid: g, valid: true, reason: '' };
+                }
+            },
+            AMBUSH: {
+                example: 'AMBUSH ' + CODE_LIST[0],
+                parse(text) {
+                    const m = text.match(AMBUSH_RE);
+                    return m ? { type: 'AMBUSH', target: COLOUR_OF_CODE[m[1]] } : null;
+                },
+                check(order, myColour) {
+                    return myColour && order.target === myColour ? '✗ You can\'t ambush your own agency — pick a rival\'s codename.' : null;
+                },
+                // A standing ambush captures the target's base square for the attacker, whoever holds it now,
+                // unless the target has a DEFEND in force this round.
+                apply(grid, order, ctx) {
+                    return ambushBase(grid, order.target, ctx.colour, ctx);
+                }
+            },
+            DEFEND: {
+                example: 'DEFEND',
+                parse(text) {
+                    const m = text.match(DEFEND_RE);
+                    return m ? { type: 'DEFEND', team: COLOUR_OF_CODE[m[1]] } : null;
+                },
+                check(order, myColour) {
+                    return myColour && order.team !== myColour ? '✗ Just type DEFEND — your own codename is added for you.' : null;
+                },
+                // Gives the defender's base back (whether it was lost this round or earlier) and protects it
+                // for the rest of the round.
+                apply(grid, order, ctx) {
+                    const g = { ...grid };
+                    const me = ctx.colour;
+                    const base = BASE_OF[me];
+                    if (!base) return { grid: g, valid: false, reason: `${capWord(me)} has no base square on this board.` };
+                    g[base] = me;
+                    return { grid: g, valid: true, reason: '', defended: me };
+                }
+            }
+        };
+
+        /** Captures `targetColour`'s base for `attackerColour` unless it's defended this round. Shared by AMBUSH (and CHANGE in phase 2). */
+        function ambushBase(grid, targetColour, attackerColour, ctx) {
+            const g = { ...grid };
+            const base = BASE_OF[targetColour];
+            const name = `${CODE_OF[targetColour]} (${capWord(targetColour)})`;
+            if (!base) return { grid: g, valid: false, reason: `${name} has no base square on this board.` };
+            if (targetColour === attackerColour) return { grid: g, valid: false, reason: 'An agency can\'t ambush itself.' };
+            if (ctx && ctx.defended && ctx.defended[targetColour] === ctx.round) {
+                return { grid: g, valid: false, reason: `${name} defended its base this round, so the ambush fails.` };
+            }
+            if (g[base] === attackerColour) return { grid: g, valid: false, reason: `${capWord(attackerColour)} already holds ${name}'s base (${base}).` };
+            g[base] = attackerColour;
+            return { grid: g, valid: true, reason: '' };
+        }
+
+        /** Parses a normalised order into { type, ... } using COMMANDS, or null if it matches none. */
+        function parseOrder(text) {
+            const t = normalizeOrder(text);
+            for (const key of Object.keys(COMMANDS)) {
+                const order = COMMANDS[key].parse(t);
+                if (order) return order;
+            }
+            return null;
+        }
+
+        /** Live typing-time validation. `myColour` is optional; when given, self-ambush and wrong-team DEFEND are rejected. */
+        function validateOrderText(raw, myColour) {
+            const text = expandOrder(raw, myColour);
+            if (!text) return { valid: null, message: '' };
+            const order = parseOrder(text);
+            if (!order) {
+                return { valid: false, message: `✗ Doesn't match a recognised order. Use MOVE <from> <to> (e.g. MOVE A1 A2), AMBUSH <codename> (e.g. AMBUSH ${CODE_LIST[0]}) or DEFEND — codenames are on the legend below the map.` };
+            }
+            const problem = COMMANDS[order.type].check(order, myColour);
+            if (problem) return { valid: false, message: problem };
+            const extra = order.type === 'DEFEND' ? ` It will be sent as ${text}.` : '';
+            return { valid: true, message: `✓ Valid ${order.type} order.${extra}` };
+        }
+
+        /** Works out the board after an order stands. Returns { grid, valid, reason, defended? } without changing anything. */
+        function applyOrder(grid, plaintext, ctx) {
+            const order = parseOrder(plaintext);
+            if (!order) return { grid: { ...grid }, valid: false, reason: 'This doesn\'t match a recognised MOVE, AMBUSH or DEFEND order, so no automatic change was suggested.' };
+            return COMMANDS[order.type].apply(grid, order, ctx);
+        }
+        /* ---------------- END ORDER ENGINE ---------------- */
 
         // Word banks used to auto-generate a random "Adjective Noun" codename for each
         // team that joins (e.g. "Silver Falcon"), avoiding collisions with existing names.
@@ -1252,7 +1388,7 @@
             return {
                 phase: 'lobby', round: 1, maxRounds: 4, sessionId: 's' + Date.now(), practice: false,
                 teams: {}, grid: {}, submissions: {}, revealOrder: [], revealIdx: -1,
-                currentReveal: null, crackAttempts: {}, log: []
+                currentReveal: null, crackAttempts: {}, defended: {}, log: []
             };
         }
 
@@ -1539,7 +1675,7 @@
                 const grid = baseGridFor(g.teams || {});
                 gameRef.update({
                     phase: 'submitting', round: 1, practice: false, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {}, log: [logEntry(g, 'Game started. Round 1 begins.')]
+                    currentReveal: null, crackAttempts: {}, defended: {}, log: [logEntry(g, 'Game started. Round 1 begins.')]
                 });
             });
         }
@@ -1551,7 +1687,7 @@
                 const grid = baseGridFor(g.teams || {});
                 gameRef.update({
                     phase: 'submitting', round: 1, practice: true, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {},
+                    currentReveal: null, crackAttempts: {}, defended: {},
                     log: [logEntry(g, 'Practice round started — scores and territory won\'t count toward the real game.')]
                 });
             });
@@ -1566,7 +1702,7 @@
                 const grid = baseGridFor(teams);
                 gameRef.update({
                     phase: 'submitting', round: 1, practice: false, teams, grid, submissions: {}, revealOrder: [], revealIdx: -1,
-                    currentReveal: null, crackAttempts: {},
+                    currentReveal: null, crackAttempts: {}, defended: {},
                     log: [logEntry(g, 'Practice round finished. The real game starts now — scores and territory reset.')]
                 });
             });
@@ -1599,7 +1735,7 @@
         /** Lets the teacher end the current reveal's countdown early (e.g. once everyone has guessed). */
         function stopTimerEarly() { gameRef.child('currentReveal/timerEnded').set(true); }
 
-        /** Opens the teacher's resolution panel for the current reveal, preloading a suggested grid based on the order type (MOVE/AMBUSH) and outcome. */
+        /** Opens the teacher's resolution panel for the current reveal, preloading a suggested grid based on the order type (MOVE/AMBUSH/DEFEND) and outcome. */
         function openResolvePanel() {
             clearInterval(revealTimerHandle); revealTimerHandle = null;
             teacherResolvePanelOpen = true;
@@ -1661,40 +1797,10 @@
             el.innerHTML = notes.map(n => `<p class="muted" style="color:var(--amber);">${n}</p>`).join('');
         }
 
-        /** Computes the suggested board-ownership grid that would result from applying the given order (MOVE/AMBUSH) and outcome, without committing it — the teacher can still hand-edit before applying. */
+        /** Computes the suggested board-ownership grid that would result from applying the given order (MOVE/AMBUSH/DEFEND) and outcome, without committing it — the teacher can still hand-edit before applying. */
         function suggestGridForOutcome(baseGrid, g, cr, sub, outcome) {
-            const grid = { ...baseGrid };
-            if (outcome === 'block') return { grid, valid: true, reason: '' };
-            const text = sub.plaintext.trim().toUpperCase();
-            const moveMatch = text.match(/^MOVE\s+([A-F][1-5])\s+([A-F][1-5])/);
-            const ambushMatch = text.match(AMBUSH_RE);
-            const myColour = teamColour(g, cr.team);
-            if (moveMatch) {
-                const from = moveMatch[1], to = moveMatch[2];
-                const ownsFrom = grid[from] === myColour;
-                const isAdjacent = ADJ[from] && ADJ[from].includes(to);
-                const toIsEnemy = grid[to] && grid[to] !== myColour;
-                if (!ownsFrom) {
-                    return { grid, valid: false, reason: `${cap(myColour)} doesn't currently control ${from}, so this move can't be auto-applied.` };
-                }
-                if (!isAdjacent) {
-                    return { grid, valid: false, reason: `${to} isn't adjacent to ${from} (only up/down/left/right count), so this move can't be auto-applied.` };
-                }
-                if (toIsEnemy) {
-                    return { grid, valid: false, reason: `${to} is already held by another agency — MOVE can't capture it directly, only AMBUSH can contest enemy squares.` };
-                }
-                grid[to] = myColour;
-            } else if (ambushMatch) {
-                const target = COLOUR_OF_CODE[ambushMatch[1]];
-                const owned = SQUARES.filter(sq => grid[sq] === target);
-                const nonBase = owned.filter(sq => BASES[sq] !== target);
-                const strip = nonBase[0] || owned.find(sq => BASES[sq] === target);
-                if (strip) delete grid[strip];
-                else return { grid, valid: false, reason: `${CODE_OF[target]} (${cap(target)}) doesn't currently control any square, so there's nothing for this ambush to strip.` };
-            } else {
-                return { grid, valid: false, reason: 'This doesn\'t match a recognised MOVE or AMBUSH order, so no automatic change was suggested.' };
-            }
-            return { grid, valid: true, reason: '' };
+            if (outcome === 'block') return { grid: { ...baseGrid }, valid: true, reason: '' };
+            return applyOrder(baseGrid, sub.plaintext, { colour: teamColour(g, cr.team), defended: g.defended || {}, round: g.round });
         }
 
         /** Commits the teacher's resolved grid/outcome for the current reveal to the shared game state, updates scores, and advances to the next reveal or round end. */
@@ -1717,8 +1823,16 @@
                 const grid = pendingGrid || g.grid;
                 pendingGrid = null;
 
+                // A standing DEFEND protects the sender's base for the rest of this round.
+                const defended = { ...(g.defended || {}) };
+                const order = parseOrder(sub.plaintext);
+                if (outcome !== 'block' && order && order.type === 'DEFEND') {
+                    defended[teamColour(g, cr.team)] = g.round;
+                    log.push(logEntry(g, `${teamName(g, cr.team)}'s base is defended for the rest of round ${g.round}.`));
+                }
+
                 const nextIdx = g.revealIdx + 1;
-                let updates = { grid, teams, log, crackAttempts: {}, currentReveal: null };
+                let updates = { grid, teams, log, defended, crackAttempts: {}, currentReveal: null };
                 if (nextIdx >= g.revealOrder.length) { updates.phase = 'roundend'; }
                 else { updates.revealIdx = nextIdx; }
 
@@ -2071,31 +2185,17 @@
             renderScoreboardInto('team-scoreboard', g);
         }
 
-        /** Validates a raw order string against the MOVE/AMBUSH grammar, returning `{valid, message}` for inline feedback before encryption/submission. */
-        function validateOrderText(raw) {
-            const text = raw.trim().toUpperCase().replace(/\s+/g, ' ');
-            if (!text) return { valid: null, message: '' };
-            const moveMatch = text.match(/^MOVE ([A-F][1-5]) ([A-F][1-5])$/);
-            const ambushMatch = text.match(AMBUSH_RE);
-            if (moveMatch) {
-                if (moveMatch[1] === moveMatch[2]) return { valid: false, message: '✗ From and to squares must be different.' };
-                return { valid: true, message: '✓ Valid MOVE order.' };
-            }
-            if (ambushMatch) return { valid: true, message: '✓ Valid AMBUSH order.' };
-            return { valid: false, message: `✗ Doesn't match MOVE <from> <to> (e.g. MOVE A1 A2) or AMBUSH <codename> (e.g. AMBUSH ${CODE_LIST[0]}) — codenames are on the legend below the map.` };
-        }
-
-        /** Shows a live encrypted preview of the plaintext order box, using this team's saved cipher shift. */
+        /** Shows a live encrypted preview of the plaintext order box, using this team's saved cipher shift. A bare DEFEND is previewed with the team's codename added. */
         function updateCipherPreview() {
             const raw = document.getElementById('plaintext-input').value;
-            const validity = validateOrderText(raw);
-            const validityEl = document.getElementById('plaintext-validity');
-            validityEl.textContent = validity.message;
-            validityEl.style.color = validity.valid === true ? 'var(--ok)' : (validity.valid === false ? 'var(--red)' : 'var(--muted)');
-            const normalized = raw.trim().toUpperCase().replace(/\s+/g, ' ');
-            gameRef.child(`teams/${myTeamId}/shift`).once('value').then(s => {
-                const shift = s.val();
-                document.getElementById('ciphertext-preview').value = shift ? caesarEncrypt(normalized, shift) : '(set your shift first)';
+            gameRef.child(`teams/${myTeamId}`).once('value').then(s => {
+                const team = s.val() || {};
+                const validity = validateOrderText(raw, team.colour);
+                const validityEl = document.getElementById('plaintext-validity');
+                validityEl.textContent = validity.message;
+                validityEl.style.color = validity.valid === true ? 'var(--ok)' : (validity.valid === false ? 'var(--red)' : 'var(--muted)');
+                const toSend = expandOrder(raw, team.colour);
+                document.getElementById('ciphertext-preview').value = team.shift ? caesarEncrypt(toSend, team.shift) : '(set your shift first)';
             });
         }
 
@@ -2103,14 +2203,15 @@
         function submitCommand() {
             const raw = document.getElementById('plaintext-input').value;
             const statusEl = document.getElementById('team-submit-status');
-            const validity = validateOrderText(raw);
-            if (!validity.valid) {
-                statusEl.textContent = validity.message ? 'Fix your order first — see the message above the encrypted preview.' : 'Type an order first.';
-                return;
-            }
-            const plaintext = raw.trim().toUpperCase().replace(/\s+/g, ' ');
-            gameRef.child(`teams/${myTeamId}/shift`).once('value').then(s => {
-                const shift = s.val();
+            gameRef.child(`teams/${myTeamId}`).once('value').then(s => {
+                const team = s.val() || {};
+                const validity = validateOrderText(raw, team.colour);
+                if (!validity.valid) {
+                    statusEl.textContent = validity.message ? 'Fix your order first — see the message above the encrypted preview.' : 'Type an order first.';
+                    return;
+                }
+                const plaintext = expandOrder(raw, team.colour);
+                const shift = team.shift;
                 if (!shift) { statusEl.textContent = 'Set your cipher shift above before submitting.'; return; }
                 const ciphertext = caesarEncrypt(plaintext, shift);
                 gameRef.child(`submissions/${myTeamId}`).set({ plaintext, ciphertext, submittedAt: Date.now() });
