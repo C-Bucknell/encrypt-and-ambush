@@ -342,7 +342,7 @@
             line-height: 1.6;
         }
 
-        .cmd-move, .cmd-ambush {
+        .cmd-move, .cmd-ambush, .cmd-steal {
             font-weight: 700;
             padding: 2px 6px;
             border-radius: 4px;
@@ -354,6 +354,12 @@
             color: var(--cmd-move);
             border-color: rgba(95,224,184,.4);
             background: rgba(95,224,184,.1);
+        }
+
+        .cmd-steal {
+            color: #ffb35c;
+            border-color: rgba(255,179,92,.4);
+            background: rgba(255,179,92,.1);
         }
 
         .cmd-ambush {
@@ -731,6 +737,14 @@
         }
         @media (max-width: 860px) { #screen-teacher .grid2 { grid-template-columns: 1fr; } }
         /* Part of an order the app fills in for you (shown dashed so students don't type it) */
+        button:disabled, button.danger:disabled, button.ghost:disabled {
+            background: #3a3f42 !important; color: #7d8388 !important; border-color: #3a3f42 !important; cursor: not-allowed; filter: none;
+        }
+        #confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        #confirm-overlay.hidden { display: none; }
+        #confirm-box { background: var(--panel, #15191b); border: 1px solid var(--amber-dim, #6b5a2a); border-radius: 10px; padding: 20px 22px; max-width: 460px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+        #confirm-msg { margin: 0 0 16px; line-height: 1.6; color: #e6e2d6; font-size: 15px; }
+        #confirm-box .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
         code.auto-part { border: 1px dashed var(--muted) !important; background: transparent !important; color: var(--muted) !important; }
 </style>
 </head>
@@ -907,7 +921,7 @@
             <div class="bar-actions">
                 <button class="ghost small" id="btn-lock-game" onclick="toggleLock()">Lock joining</button>
                 <button class="ghost small" id="btn-close-game" onclick="toggleClosed()">Close game</button>
-                <button class="danger small" id="btn-end-game-top" onclick="teacherEndGame()" disabled>End game</button>
+                <button class="danger small" id="btn-end-game-top" onclick="teacherEndGame()">End game</button>
                 <details class="console-menu">
                     <summary class="small">Menu ▾</summary>
                     <div class="console-menu-list">
@@ -962,7 +976,7 @@
                         <button class="ghost hidden" onclick="skipCrackerChoice()" id="btn-skip-choice">Skip choice (BLOCK)</button>
                         <button onclick="openResolvePanel()" id="btn-resolve" disabled>Resolve &amp; apply</button>
                     </div>
-                    <p class="hint">Stop the clock once everyone has guessed. If someone cracked it, they get 15 seconds to choose BLOCK, STEAL or CHANGE on their screen; Resolve unlocks when they choose (or BLOCK is applied automatically).</p>
+                    <p class="hint">Stop the clock once everyone has guessed. If someone cracked it, they get 15 seconds to choose BLOCK or CHANGE on their screen (only ambushes can be CHANGEd; anything else is BLOCKED straight away). Resolve unlocks when they choose, or BLOCK is applied automatically.</p>
                 </div>
 
                 <div class="panel hidden" id="teacher-resolve-panel">
@@ -972,7 +986,6 @@
                     <select id="resolve-outcome" onchange="onOutcomeChange()">
                         <option value="stand">Order stands — apply it</option>
                         <option value="block">BLOCK — cracked, order cancelled</option>
-                        <option value="steal">STEAL — cracked, cracker takes 1 point, order still goes ahead</option>
                         <option value="change">CHANGE — (only when the cracker chose it)</option>
                     </select>
                     <div id="resolve-note"></div>
@@ -995,6 +1008,10 @@
                 <div class="panel hidden" id="teacher-ended-panel">
                     <h3>Final results</h3>
                     <div id="final-ranking"></div>
+                    <div class="grid2" style="margin-top:14px;">
+                        <button class="ghost" onclick="confirmReset()">Play again (same code)</button>
+                        <button class="ghost" onclick="openTeacherHome()">‹ Back to My games</button>
+                    </div>
                 </div>
                 <details class="panel settings-panel" id="teacher-settings">
                     <summary><h3 style="display:inline;">Game settings</h3> <span class="muted" id="settings-summary" style="font-size:12px;"></span></summary>
@@ -1086,7 +1103,7 @@
 
             <div class="panel" id="team-incoming-panel">
                 <h3>Incoming message</h3>
-                <div id="incoming-idle" class="muted">No incoming intercept right now. When the console reveals a transmission it appears here: you'll have 30 seconds to crack it. The first correct crack earns +1 and chooses BLOCK, STEAL or CHANGE.</div>
+                <div id="incoming-idle" class="muted">No incoming intercept right now. When the console reveals a transmission it appears here: you'll have 30 seconds to crack it. The first correct crack earns +1 and BLOCKS it (or, for an ambush, can CHANGE it).</div>
                 <div id="incoming-active" class="hidden">
                     <div class="center muted" style="margin-bottom:8px;">Intercept <strong id="tc-index"></strong> — sender hidden until resolved</div>
                     <div class="slip incoming-live" id="tc-slip">
@@ -1140,10 +1157,11 @@
                     </div>
                     <div>
                         <p class="hint" style="margin-top:0; line-height:2;">
-                            <code class="cmd-move">MOVE A1 A2</code><br><span class="muted">→ claim an adjacent square</span><br><br>
+                            <code class="cmd-move">MOVE A1 A2</code><br><span class="muted">→ claim an empty square next to yours</span><br><br>
+                            <code class="cmd-steal">STEAL A1 A2</code><br><span class="muted">→ take a rival's square next to yours (not a base)</span><br><br>
                             <code class="cmd-ambush">AMBUSH RUBY</code><br><span class="muted">→ capture that agency's base (unless they defend)</span><br><br>
                             <code class="cmd-ambush">DEFEND</code><br><span class="muted">→ take back your base and protect it this round (your codename is added for you)</span><br><br>
-                            <span class="muted">One order per round, no undo. Squares A–F, 1–5. MOVE only to an adjacent square (no diagonals) that isn't enemy-held.</span>
+                            <span class="muted">One order per round, no undo. Squares A–F, 1–5. MOVE and STEAL only reach up/down/left/right (no diagonals).</span>
                         </p>
                     </div>
                 </div>
@@ -1157,7 +1175,7 @@
 
             <div class="panel">
                 <h3>Scoreboard</h3>
-                <p class="hint" style="margin-top:0;">Score = 1 per square (bases are worth 2) + 1 per successful crack + points stolen − points lost.</p>
+                <p class="hint" style="margin-top:0;">Score = 1 per square (bases are worth 2) + 1 per successful crack.</p>
                 <div id="team-scoreboard"></div>
             </div>
 
@@ -1227,8 +1245,8 @@
                 <p class="hint" style="margin-top:0;">You are rival spy agencies fighting over a digital map. Every order
                     you send is encrypted with your own Caesar shift — and every other agency is trying to crack it.</p>
                 <p class="hint">Goal: finish with the most points. <strong>1 point</strong> for every square you hold,
-                    <strong>2 points</strong> for every base you hold, <strong>+1</strong> for every enemy order you crack
-                    first, plus or minus any points stolen.</p>
+                    <strong>2 points</strong> for every base you hold, and <strong>+1</strong> for every enemy order you crack
+                    first.</p>
             </div>
 
             <div class="panel">
@@ -1246,7 +1264,7 @@
             <div class="panel">
                 <h3>Step 2 — Learn the board</h3>
                 <p class="hint">Squares are named by column (A–F) then row (1–5) — A1 is top-left, F5 is bottom-right. When you
-                    <code class="cmd-move">MOVE</code>, you can only move to a square directly next to yours:</p>
+                    <code class="cmd-move">MOVE</code> or <code class="cmd-steal">STEAL</code>, you can only reach a square directly next to yours:</p>
                 <svg viewBox="0 0 300 300" style="max-width:260px; width:100%; margin:16px auto; display:block;">
                     <rect x="0" y="0" width="92" height="92" rx="6" fill="rgba(192,69,59,.12)" stroke="#2a3034" stroke-width="1" />
                     <rect x="208" y="0" width="92" height="92" rx="6" fill="rgba(192,69,59,.12)" stroke="#2a3034" stroke-width="1" />
@@ -1275,7 +1293,7 @@
 
             <div class="panel">
                 <h3>Step 3 — Write your order</h3>
-                <p class="hint">Each round, every team submits exactly <strong>one</strong> order. There are three kinds:</p>
+                <p class="hint">Each round, every team submits exactly <strong>one</strong> order. There are four kinds:</p>
 
                 <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">MOVE — claim a square</p>
                 <div class="anatomy-row">
@@ -1289,9 +1307,27 @@
                     </div>
                     <div class="anatomy-part">
                         <code>A2</code>
-                        <p class="hint">TO — adjacent, and not enemy-held</p>
+                        <p class="hint">TO — adjacent and empty (use STEAL for an enemy square)</p>
                     </div>
                 </div>
+
+                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">STEAL — take a rival's square</p>
+                <div class="anatomy-row">
+                    <div class="anatomy-part">
+                        <code class="cmd-steal">STEAL</code>
+                        <p class="hint">the command</p>
+                    </div>
+                    <div class="anatomy-part">
+                        <code>A1</code>
+                        <p class="hint">FROM — a square you already control</p>
+                    </div>
+                    <div class="anatomy-part">
+                        <code>A2</code>
+                        <p class="hint">TO — the rival square next to it</p>
+                    </div>
+                </div>
+                <p class="hint">If it isn't cracked, the rival's square becomes yours. It must be up/down/left/right of your
+                    square, and it can't be a <strong>base</strong> (only AMBUSH takes a base).</p>
 
                 <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">AMBUSH — capture a rival's base</p>
                 <div class="anatomy-row">
@@ -1321,8 +1357,8 @@
                 <p class="hint">So typing <code class="cmd-ambush">DEFEND</code> sends <code>DEFEND RUBY</code> (with your codename).
                     If it isn't blocked, you get your base back (even if you lost it in an earlier round) and it
                     can't be ambushed for the rest of the round.</p>
-                <p class="hint">Codenames (like RUBY, AQUA, LIME) are always 4 letters, so AMBUSH and DEFEND orders are the
-                    same length once encrypted. Check the legend under your tactical map for which codename belongs to
+                <p class="hint">Codenames (like RUBY, AQUA, LIME) are always 4 letters, so STEAL, AMBUSH and DEFEND orders are all
+                    the same length once encrypted. Check the legend under your tactical map for which codename belongs to
                     which team.</p>
             </div>
 
@@ -1360,11 +1396,11 @@
                 </div>
                 <p class="hint">Watch the <strong>Incoming message</strong> panel. When it lights up and it isn't your own
                     order, type your best guess of the plain text. A wrong guess costs nothing.</p>
-                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">If you crack it first, choose one (15 seconds):</p>
+                <p class="hint" style="margin-top:16px; color:var(--amber); font-weight:600;">If you crack it first:</p>
                 <ul style="margin:6px 0 0; padding-left:18px; color:#e6e2d6; font-size:13px; line-height:1.9;">
-                    <li><strong>BLOCK</strong> — their order is cancelled.</li>
-                    <li><strong>STEAL</strong> — take 1 point from them. Their order still goes ahead.</li>
-                    <li><strong>CHANGE</strong> (ambushes only, 3+ teams) — pick a new target and capture <em>that</em> base yourself.</li>
+                    <li><strong>BLOCK</strong> — their order is cancelled. A cracked MOVE, STEAL or DEFEND is always blocked.</li>
+                    <li><strong>CHANGE</strong> (ambushes only) — instead of blocking, pick any base you don't already hold and
+                        capture <em>that</em> base yourself. You have 15 seconds to choose BLOCK or CHANGE.</li>
                 </ul>
                 <p class="hint">If you don't choose in time, BLOCK is chosen for you. If nobody cracks an order, it stands.</p>
             </div>
@@ -1372,15 +1408,17 @@
             <div class="panel">
                 <h3>Step 6 — Scoring &amp; next round</h3>
                 <p class="hint" style="margin-top:0;">Your score = 1 point per square you hold, 1 extra for each base you
-                    hold (so a base is worth 2), +1 for each order you crack first, plus points you steal, minus points
-                    stolen from you. The game runs for several rounds (usually 4); highest score wins.</p>
+                    hold (so a base is worth 2), and +1 for each order you crack first. The game runs for several rounds (usually 4); highest score wins.</p>
             </div>
 
             <div class="panel" style="border-color:var(--red);">
                 <h3 style="color:var(--red);">Common mistakes to avoid</h3>
                 <ul style="margin:0; padding-left:18px; color:#e6e2d6; font-size:13px; line-height:1.9;">
-                    <li><code class="cmd-move">MOVE</code> must start from a square <strong>you already control</strong>,
-                        and can't land on an enemy square — only AMBUSH takes enemy territory.</li>
+                    <li>Only <code class="cmd-steal">STEAL</code> or <code class="cmd-ambush">AMBUSH</code> takes an enemy square:
+                        STEAL takes an ordinary square next to yours, AMBUSH takes a base. <code class="cmd-move">MOVE</code>
+                        only claims an <strong>empty</strong> square.</li>
+                    <li><code class="cmd-move">MOVE</code> and <code class="cmd-steal">STEAL</code> must start from a square
+                        <strong>you already control</strong>.</li>
                     <li>Adjacent means <strong>up/down/left/right only</strong> — never diagonal, even if it looks close.</li>
                     <li><code class="cmd-ambush">AMBUSH</code> targets a <strong>codename</strong> (e.g. RUBY), not a colour
                         word (e.g. "Red"), and you can't ambush yourself.</li>
@@ -1388,7 +1426,7 @@
                         codename.</li>
                     <li>Submit <strong>before the timer runs out</strong>, or you miss your order that round.</li>
                     <li>Set your cipher shift <strong>before</strong> the game starts — it locks in for the whole game.</li>
-                    <li>When you crack a message, decide fast — you have 15 seconds before BLOCK is chosen for you.</li>
+                    <li>When you crack an ambush, decide fast — you have 15 seconds before BLOCK is chosen for you.</li>
                 </ul>
             </div>
 
@@ -1505,8 +1543,34 @@
                     const me = ctx.colour;
                     if (g[order.from] !== me) return { grid: g, valid: false, reason: `${capWord(me)} doesn't currently control ${order.from}, so this move can't be auto-applied.` };
                     if (!(ADJ[order.from] || []).includes(order.to)) return { grid: g, valid: false, reason: `${order.to} isn't adjacent to ${order.from} (only up/down/left/right count), so this move can't be auto-applied.` };
-                    if (g[order.to] && g[order.to] !== me) return { grid: g, valid: false, reason: `${order.to} is already held by another agency — MOVE can't capture it, only AMBUSH can take a base.` };
+                    if (g[order.to] && g[order.to] !== me) return { grid: g, valid: false, reason: `${order.to} is already held by another agency — MOVE can't take it; that needs STEAL.` };
                     if (g[order.to] === me) return { grid: g, valid: false, reason: `${capWord(me)} already holds ${order.to}, so this move changes nothing.` };
+                    g[order.to] = me;
+                    return { grid: g, valid: true, reason: '' };
+                }
+            },
+            STEAL: {
+                example: 'STEAL A1 A2',
+                parse(text) {
+                    const m = text.match(/^STEAL ([A-F][1-5]) ([A-F][1-5])$/);
+                    return m ? { type: 'STEAL', from: m[1], to: m[2] } : null;
+                },
+                check(order) {
+                    if (order.from === order.to) return '✗ From and to squares must be different.';
+                    if (!(ADJ[order.from] || []).includes(order.to)) return `✗ ${order.to} isn't next to ${order.from} — STEAL only reaches up/down/left/right, never diagonal.`;
+                    if (BASES[order.to]) return `✗ ${order.to} is a base — only AMBUSH can take a base.`;
+                    return null;
+                },
+                // Takes a rival-held square next to one of yours. Bases can't be stolen (AMBUSH only),
+                // and DEFEND doesn't protect ordinary squares.
+                apply(grid, order, ctx) {
+                    const g = { ...grid };
+                    const me = ctx.colour;
+                    if (g[order.from] !== me) return { grid: g, valid: false, reason: `${capWord(me)} doesn't currently control ${order.from}, so this steal can't be auto-applied.` };
+                    if (!(ADJ[order.from] || []).includes(order.to)) return { grid: g, valid: false, reason: `${order.to} isn't adjacent to ${order.from} (only up/down/left/right count), so this steal can't be auto-applied.` };
+                    if (BASES[order.to]) return { grid: g, valid: false, reason: `${order.to} is a base square — bases can only be taken by AMBUSH.` };
+                    if (!g[order.to]) return { grid: g, valid: false, reason: `${order.to} is empty — there's nothing to steal (a MOVE would have claimed it).` };
+                    if (g[order.to] === me) return { grid: g, valid: false, reason: `${capWord(me)} already holds ${order.to}, so this steal changes nothing.` };
                     g[order.to] = me;
                     return { grid: g, valid: true, reason: '' };
                 }
@@ -1582,7 +1646,7 @@
             if (!text) return { valid: null, message: '' };
             const order = parseOrder(text);
             if (!order) {
-                return { valid: false, message: `✗ Doesn't match a recognised order. Use MOVE <from> <to> (e.g. MOVE A1 A2), AMBUSH <codename> (e.g. AMBUSH ${CODE_LIST[0]}) or DEFEND — codenames are on the legend below the map.` };
+                return { valid: false, message: `✗ Doesn't match a recognised order. Use MOVE <from> <to> (e.g. MOVE A1 A2), STEAL <from> <to> (e.g. STEAL A1 A2), AMBUSH <codename> (e.g. AMBUSH ${CODE_LIST[0]}) or DEFEND — codenames are on the legend below the map.` };
             }
             const problem = COMMANDS[order.type].check(order, myColour, joined);
             if (problem) return { valid: false, message: problem };
@@ -1593,39 +1657,42 @@
         /** Works out the board after an order stands. Returns { grid, valid, reason, defended? } without changing anything. */
         function applyOrder(grid, plaintext, ctx) {
             const order = parseOrder(plaintext);
-            if (!order) return { grid: { ...grid }, valid: false, reason: 'This doesn\'t match a recognised MOVE, AMBUSH or DEFEND order, so no automatic change was suggested.' };
+            if (!order) return { grid: { ...grid }, valid: false, reason: 'This doesn\'t match a recognised MOVE, STEAL, AMBUSH or DEFEND order, so no automatic change was suggested.' };
             return COMMANDS[order.type].apply(grid, order, ctx);
         }
 
         /* ---------------- CRACKER'S CHOICE ----------------
-           When a message is cracked, the first cracker picks BLOCK, STEAL or CHANGE (AMBUSH only).
+           When a message is cracked, the first cracker picks BLOCK or CHANGE (AMBUSH only, and only while
+           there's a base left that the cracker doesn't hold). Any other order is simply BLOCKED.
            The cracker always earns +1 for the interception on top of the chosen effect. */
         const CHOICE_SECONDS = 15;
         const CRACK_ACTIONS = {
             block: { label: 'BLOCK', effect: 'Cancel their order. It has no effect.' },
-            steal: { label: 'STEAL', effect: 'Take 1 point from them. Their order still goes ahead.' },
             change: { label: 'CHANGE', effect: 'Redirect their ambush at a team you pick, and capture that base yourself.' }
         };
 
-        /** Which actions and CHANGE targets a cracker may pick. `colours` = every colour in the game. */
-        function crackerOptions(plaintext, crackerColour, colours) {
+        /**
+         * Which actions and CHANGE targets a cracker may pick. `colours` = every colour in the game, `grid` = the board now.
+         * CHANGE is offered for an AMBUSH in a game of any size, as long as some other team's base isn't already the cracker's.
+         * The target can be any of those bases, including the one originally ambushed or the sender's own.
+         */
+        function crackerOptions(plaintext, crackerColour, colours, grid) {
             const order = parseOrder(plaintext);
             const isAmbush = !!order && order.type === 'AMBUSH';
-            const actions = isAmbush ? ['block', 'steal', 'change'] : ['block', 'steal'];
+            const board = grid || {};
             const targets = isAmbush
-                ? (colours || []).filter(c => c !== crackerColour && c !== order.target && BASE_OF[c])
+                ? (colours || []).filter(c => c !== crackerColour && BASE_OF[c] && board[BASE_OF[c]] !== crackerColour)
                 : [];
-            return { actions: targets.length ? actions : actions.filter(a => a !== 'change'), targets, isAmbush, originalTarget: isAmbush ? order.target : null };
+            return { actions: targets.length ? ['block', 'change'] : ['block'], targets, isAmbush, originalTarget: isAmbush ? order.target : null };
         }
 
         /**
          * Board result for the final outcome of one intercept.
-         * outcome: 'stand' | 'block' | 'steal' | 'change'
+         * outcome: 'stand' | 'block' | 'change'
          * ctx: { colour (sender), crackerColour, changeTarget, defended, round }
          */
         function resolveOutcome(grid, plaintext, outcome, ctx) {
-            // STEAL takes a point but the sender's order still goes ahead.
-            if (outcome === 'stand' || outcome === 'steal') return applyOrder(grid, plaintext, ctx);
+            if (outcome === 'stand') return applyOrder(grid, plaintext, ctx);
             if (outcome === 'change') {
                 if (!ctx.crackerColour || !ctx.changeTarget) return { grid: { ...grid }, valid: false, reason: 'CHANGE needs a cracking team and a new target.' };
                 return ambushBase(grid, ctx.changeTarget, ctx.crackerColour, ctx);
@@ -1633,10 +1700,10 @@
             return { grid: { ...grid }, valid: true, reason: '' }; // block leaves the board alone
         }
 
-        /** Points that move for an outcome: interception (+1 to cracker), stolen (+1 cracker) and lost (−1 sender). */
+        /** Points for an outcome: +1 interception to the cracker for BLOCK or CHANGE. */
         function scoreChanges(outcome, hasCracker) {
-            if (!hasCracker || outcome === 'stand') return { interception: 0, stolen: 0, lost: 0 };
-            return { interception: 1, stolen: outcome === 'steal' ? 1 : 0, lost: outcome === 'steal' ? 1 : 0 };
+            if (!hasCracker || outcome === 'stand') return { interception: 0 };
+            return { interception: 1 };
         }
 
         /** How many base squares (any team's) this colour currently holds. */
@@ -1644,7 +1711,7 @@
             return Object.keys(BASES).filter(sq => (grid || {})[sq] === colour).length;
         }
 
-        /** A team's total: 1 per square + 1 extra per base held (so a base is worth 2) + interceptions + points stolen − points lost. */
+        /** A team's total: 1 per square + 1 extra per base held (so a base is worth 2) + interceptions. (stolen/lost are from older games, before the cracker's STEAL point option was removed.) */
         function teamTotal(team, grid) {
             const territory = Object.values(grid || {}).filter(o => o === team.colour).length;
             return territory + basesHeld(team.colour, grid) + (team.score || 0) + (team.stolen || 0) - (team.lost || 0);
@@ -1842,7 +1909,9 @@
             practiceRunning = !!g.practice && g.phase !== 'lobby' && g.phase !== 'ended';
             document.getElementById('phase-pill').textContent = g.practice && g.phase !== 'lobby' && g.phase !== 'ended' ? 'PRACTICE' : g.phase.toUpperCase();
             document.getElementById('phase-pill').classList.toggle('live', g.phase !== 'lobby' && g.phase !== 'ended');
-            document.getElementById('btn-end-game-top').disabled = (g.phase === 'lobby' || g.phase === 'ended');
+            const endBtn = document.getElementById('btn-end-game-top');
+            endBtn.disabled = g.phase === 'ended';
+            endBtn.title = g.phase === 'ended' ? 'This game has already ended' : 'End the game now (you\'ll be asked to confirm)';
 
             const maxRoundInput = document.getElementById('teacher-max-rounds');
             const maxRoundStatus = document.getElementById('teacher-rounds-status');
@@ -1951,7 +2020,7 @@
             }).join('');
             document.getElementById('t-crack-attempts').innerHTML = rows || '<p class="muted">No decryption attempts yet.</p>';
 
-            // Once the clock stops with a winner, open the cracker's choice (BLOCK / STEAL / CHANGE).
+            // Once the clock stops with a winner, open the cracker's choice (BLOCK / CHANGE).
             if (cr.timerEnded && winnerId && !cr.choice) openCrackerChoice(g, winnerId);
             const choice = cr.choice;
             const waitingOnChoice = !!(winnerId && (!choice || !choice.action));
@@ -1960,8 +2029,10 @@
             let caption;
             if (!winnerId) caption = cr.timerEnded ? 'Clock stopped — nobody cracked it, so the order stands.' : 'Other agencies are attempting to crack this.';
             else if (!cr.timerEnded) caption = `${teamName(g, winnerId)} was the first to crack it.`;
-            else if (waitingOnChoice) caption = `${teamName(g, winnerId)} cracked it first and is choosing BLOCK, STEAL or CHANGE…`;
-            else caption = `${teamName(g, winnerId)} chose ${describeChoice(g, choice)}. Ready to resolve.`;
+            else if (waitingOnChoice) caption = `${teamName(g, winnerId)} cracked it first and is choosing BLOCK or CHANGE…`;
+            else caption = choice.only
+                ? `${teamName(g, winnerId)} cracked it, so it's BLOCKED (only ambushes can be CHANGEd). Ready to resolve.`
+                : `${teamName(g, winnerId)} chose ${describeChoice(g, choice)}. Ready to resolve.`;
             document.getElementById('t-timer-caption').textContent = caption;
 
             if (!revealTimerHandle) revealTimerHandle = setInterval(() => tickTimer('teacher'), 250);
@@ -2003,8 +2074,8 @@
         }
 
         /** Randomly reassigns colours across all currently joined teams (lobby-only action) — useful if the teacher wants a different colour spread before starting. */
-        function reshuffleColours() {
-            if (!confirm('Reshuffle everyone\'s assigned colour? Any team already looking at their colour will see it change.')) return;
+        async function reshuffleColours() {
+            if (!await askConfirm('Reshuffle everyone\'s assigned colour? Any team already looking at their colour will see it change.')) return;
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const ids = Object.keys(g.teams || {});
@@ -2097,10 +2168,11 @@
             const sub = (g.submissions || {})[cr.team];
             if (!sub) return;
             const colours = Object.values(g.teams || {}).map(t => t.colour).filter(Boolean);
-            const opts = crackerOptions(sub.plaintext, teamColour(g, winnerId), colours);
+            const opts = crackerOptions(sub.plaintext, teamColour(g, winnerId), colours, g.grid);
+            const only = opts.actions.length === 1; // nothing to choose: BLOCK straight away, keep the game moving
             gameRef.child('currentReveal/choice').transaction(cur => cur || {
                 by: winnerId, deadline: Date.now() + CHOICE_SECONDS * 1000,
-                actions: opts.actions, targets: opts.targets, action: null, target: null
+                actions: opts.actions, targets: opts.targets, action: only ? 'block' : null, target: null, only
             });
         }
 
@@ -2141,6 +2213,8 @@
         /** Short human description of a choice, e.g. "CHANGE → AQUA (Blue)". */
         function describeChoice(g, choice) {
             if (!choice || !choice.action) return 'nothing yet';
+            if (!CRACK_ACTIONS[choice.action]) return 'BLOCK';
+            if (choice.only) return 'BLOCK (the only option for this order)';
             const label = CRACK_ACTIONS[choice.action].label;
             const tail = choice.action === 'change' && choice.target ? ` → ${CODE_OF[choice.target]} (${cap(choice.target)})` : '';
             return label + tail + (choice.auto ? ' (automatic — time ran out or console skipped)' : '');
@@ -2162,7 +2236,7 @@
                 const attempts = g.crackAttempts || {};
                 const crackedBy = creditedCracker(g);
                 const choice = cr.choice || {};
-                const outcome = crackedBy ? (choice.action || 'block') : 'stand';
+                const outcome = crackedBy ? (CRACK_ACTIONS[choice.action] ? choice.action : 'block') : 'stand';
                 resolvingRevealIdx = g.revealIdx;
                 const changeOpt = document.querySelector('#resolve-outcome option[value="change"]');
                 changeOpt.disabled = !(choice.action === 'change' && choice.target);
@@ -2222,7 +2296,7 @@
                 notes.push(`⚠ ${result.reason} No square has been auto-changed — use the map below if you want to apply something manually.`);
             }
             if (outcome !== 'stand' && !crackedBy) {
-                notes.push('⚠ Nobody cracked this, so BLOCK / STEAL / CHANGE will have no cracking team to credit.');
+                notes.push('⚠ Nobody cracked this, so BLOCK / CHANGE will have no cracking team to credit.');
             }
             if (outcome === 'stand' && crackedBy) {
                 notes.push(`⚠ This was cracked, but "stand" means the cracking team won't get their interception point or their choice. Switch back to their choice if that wasn't intentional.`);
@@ -2264,11 +2338,8 @@
                 const pts = scoreChanges(outcome, !!crackedBy);
                 if (crackedBy && outcome !== 'stand') {
                     teams[crackedBy].score = (teams[crackedBy].score || 0) + pts.interception;
-                    teams[crackedBy].stolen = (teams[crackedBy].stolen || 0) + pts.stolen;
-                    teams[cr.team].lost = (teams[cr.team].lost || 0) + pts.lost;
                     const cracker = teamName(g, crackedBy), sender = teamName(g, cr.team);
                     if (outcome === 'block') log.push(logEntry(g, `${cracker} cracked ${sender}'s order and BLOCKED it. +1 interception point.`));
-                    if (outcome === 'steal') log.push(logEntry(g, `${cracker} cracked ${sender}'s order and STOLE 1 point — their order still goes ahead: ${sub.plaintext}. +1 interception point.`));
                     if (outcome === 'change') {
                         const tgt = document.getElementById('resolve-outcome').dataset.changeTarget;
                         log.push(logEntry(g, `${cracker} cracked ${sender}'s ambush and CHANGED it to hit ${CODE_OF[tgt] || '?'} for themselves. +1 interception point.`));
@@ -2282,7 +2353,7 @@
                 // A standing DEFEND protects the sender's base for the rest of this round.
                 const defended = { ...(g.defended || {}) };
                 const order = parseOrder(sub.plaintext);
-                if ((outcome === 'stand' || outcome === 'steal') && order && order.type === 'DEFEND') {
+                if (outcome === 'stand' && order && order.type === 'DEFEND') {
                     defended[teamColour(g, cr.team)] = g.round;
                     log.push(logEntry(g, `${teamName(g, cr.team)}'s base is defended for the rest of round ${g.round}.`));
                 }
@@ -2435,20 +2506,25 @@
             });
         }
         /** Ends the game after teacher confirmation, moving to the final results screen. */
-        function teacherEndGame() {
+        async function teacherEndGame() {
             if (practiceRunning) {
-                if (confirm('This is the practice round. End practice and return everyone to the lobby? Nothing from practice counts.')) teacherEndPractice();
+                if (await askConfirm('This is the practice round. End practice and return everyone to the lobby? Nothing from practice counts.', 'End practice')) teacherEndPractice();
                 return;
             }
-            if (!confirm('End the game now and show final results?')) return;
-            gameRef.once('value').then(snap => {
-                const g = snap.val();
-                gameRef.update({ phase: 'ended', currentReveal: null, log: [...(g.log || []), logEntry(g, 'Game ended by console.')] });
-            });
+            const g = (await gameRef.once('value')).val() || {};
+            if (g.phase === 'ended') return;
+            const msg = g.phase === 'lobby'
+                ? 'End this game now? No rounds have been played, so there are no results. Use Reset game later if you want to play with this code again.'
+                : 'End the game now and show the final results to everyone?';
+            if (!await askConfirm(msg, 'End game')) return;
+            clearInterval(revealTimerHandle); revealTimerHandle = null;
+            teacherResolvePanelOpen = false;
+            const fresh = (await gameRef.once('value')).val() || g;
+            await gameRef.update({ phase: 'ended', currentReveal: null, log: [...(fresh.log || []), logEntry(fresh, 'Game ended by console.')] });
         }
         /** Wipes the entire game back to a fresh lobby state after teacher confirmation — clears all teams, scores and colours. */
-        function confirmReset() {
-            if (confirm('Reset this game? This removes all teams, clears the scoreboard, field log and map, and sends students back to the join screen (the join code stays the same). This cannot be undone.')) {
+        async function confirmReset() {
+            if (await askConfirm('Reset this game? This removes all teams, clears the scoreboard, field log and map, and sends students back to the join screen (the join code stays the same). This cannot be undone.', 'Reset game')) {
                 clearInterval(revealTimerHandle); revealTimerHandle = null;
                 teacherResolvePanelOpen = false;
                 gameRef.once('value').then(snap => {
@@ -2635,7 +2711,7 @@
         }
 
         async function deleteGame(code) {
-            if (!confirm(`Delete game ${code}? Teams in it will be disconnected. This can't be undone.`)) return;
+            if (!await askConfirm(`Delete game ${code}? Teams in it will be disconnected. This can't be undone.`, 'Delete')) return;
             try { await db.ref('games/' + code).remove(); } catch (e) { alert('Could not delete: ' + e.message); return; }
             const owner = access.user.uid;
             await db.ref('teacherGames/' + owner + '/' + code).remove().catch(() => { });
@@ -2679,9 +2755,9 @@
             gameRef.child('status').once('value').then(s => gameRef.update({ status: s.val() === 'locked' ? 'open' : 'locked' }));
         }
         function toggleClosed() {
-            gameRef.child('status').once('value').then(s => {
+            gameRef.child('status').once('value').then(async s => {
                 if (s.val() === 'closed') { gameRef.update({ status: 'locked' }); return; }
-                if (confirm('Close this game? Students will be shown "closed by your teacher" and can\'t play until you reopen it.')) gameRef.update({ status: 'closed' });
+                if (await askConfirm('Close this game? Students will be shown "closed by your teacher" and can\'t play until you reopen it.', 'Close game')) gameRef.update({ status: 'closed' });
             });
         }
 
@@ -2791,13 +2867,13 @@
         }
         async function setRole(kind, uid, on) {
             try {
-                if (!on) { if (confirm(`Remove this ${kind === 'owners' ? 'owner' : 'admin'}?`)) await db.ref(`roles/${kind}/${uid}`).remove(); return; }
+                if (!on) { if (await askConfirm(`Remove this ${kind === 'owners' ? 'owner' : 'admin'}?`)) await db.ref(`roles/${kind}/${uid}`).remove(); return; }
                 const t = (await db.ref('teachers/' + uid).once('value')).val() || {};
                 await db.ref(`roles/${kind}/${uid}`).set({ name: t.name || '', email: t.email || '', school: t.school || '', addedBy: access.user.uid, addedAt: Date.now() });
             } catch (e) { alert('Not allowed or failed: ' + e.message); }
         }
         async function adminDeleteGame(code) {
-            if (!confirm(`Delete game ${code}?`)) return;
+            if (!await askConfirm(`Delete game ${code}?`, 'Delete')) return;
             const g = (await db.ref('games/' + code).once('value')).val() || {};
             await db.ref('games/' + code).remove().catch(e => alert(e.message));
             if (g.ownerUid) db.ref('teacherGames/' + g.ownerUid + '/' + code).remove().catch(() => { });
@@ -2849,13 +2925,13 @@
         /** Clears this team's saved setup (assigns a new random codename, clears the shift) so they can re-enter their details, only while still in the lobby. */
         function resetSetup() {
             const statusEl = document.getElementById('setup-status');
-            gameRef.once('value').then(snap => {
+            gameRef.once('value').then(async snap => {
                 const g = snap.val();
                 if (g.phase !== 'lobby') {
                     statusEl.textContent = 'The game has already started — nothing left to reset.';
                     return;
                 }
-                if (!confirm('Reset your codename and clear your cipher shift? This undoes what you\'ve entered so far.')) return;
+                if (!await askConfirm('Reset your codename and clear your cipher shift? This undoes what you\'ve entered so far.')) return;
                 const teams = g.teams || {};
                 const existingNames = Object.keys(teams).filter(tid => tid !== myTeamId).map(tid => (teams[tid].name || '').toLowerCase());
                 const newName = generateTeamName(existingNames);
@@ -3051,7 +3127,7 @@
             });
         }
 
-        /** Shows the BLOCK / STEAL / CHANGE radio buttons to the cracking team, and a status line to everyone else. No free-text input. */
+        /** Shows the BLOCK / CHANGE radio buttons to the cracking team, and a status line to everyone else. No free-text input. */
         let choiceRenderedFor = null; // avoids rebuilding the radios (and losing a selection) on every update
         function renderCrackerChoice(g, id) {
             const cr = g.currentReveal;
@@ -3064,7 +3140,9 @@
             if (choice) {
                 const who = choice.by === id ? 'You' : 'The cracking team';
                 msg.textContent = choice.action
-                    ? `${who} chose ${describeChoice(g, choice)}. Waiting for the console to resolve…`
+                    ? (choice.only
+                        ? `${choice.by === id ? 'You cracked it, so it' : 'It'}'s BLOCKED (only an ambush can be CHANGEd). Waiting for the console to resolve…`
+                        : `${who} chose ${describeChoice(g, choice)}. Waiting for the console to resolve…`)
                     : (choice.by === id ? '' : 'Another agency cracked this first and is choosing what to do with it…');
             }
             if (!mine) { choiceRenderedFor = null; return; }
@@ -3122,6 +3200,43 @@
         function logEntry(g, msg) { return `[R${g.round}] ${msg}`; }
         /** Escapes a string for safe insertion as HTML text content (guards against team-supplied names/messages containing markup). */
         function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    </script>
+    <!-- In-page confirm (replaces browser pop-ups, which Edge/Chrome can silently block) -->
+    <div id="confirm-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-msg">
+        <div id="confirm-box">
+            <p id="confirm-msg"></p>
+            <div class="confirm-actions">
+                <button class="ghost" id="confirm-cancel">Cancel</button>
+                <button class="danger" id="confirm-ok">OK</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        /** In-page replacement for confirm(): resolves true (OK) or false (Cancel / Esc / click outside). */
+        function askConfirm(message, okLabel) {
+            return new Promise(resolve => {
+                const overlay = document.getElementById('confirm-overlay');
+                const ok = document.getElementById('confirm-ok'), cancel = document.getElementById('confirm-cancel');
+                document.getElementById('confirm-msg').textContent = message;
+                ok.textContent = okLabel || 'OK';
+                const done = v => {
+                    overlay.classList.add('hidden');
+                    ok.onclick = cancel.onclick = overlay.onclick = null;
+                    document.removeEventListener('keydown', onKey, true);
+                    resolve(v);
+                };
+                const onKey = e => {
+                    if (e.key === 'Escape') { e.preventDefault(); done(false); }
+                    else if (e.key === 'Enter') { e.preventDefault(); done(true); }
+                };
+                ok.onclick = () => done(true);
+                cancel.onclick = () => done(false);
+                overlay.onclick = e => { if (e.target === overlay) done(false); };
+                document.addEventListener('keydown', onKey, true);
+                overlay.classList.remove('hidden');
+                cancel.focus();
+            });
+        }
     </script>
 </body>
 </html>

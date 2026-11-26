@@ -63,7 +63,7 @@
         },
         "currentReveal": {
           "choice": {
-            ".write": "auth != null && data.child('by').val() === auth.uid && !data.child('action').exists() && newData.child('by').val() === auth.uid && newData.child('deadline').val() === data.child('deadline').val() && newData.child('action').val().matches(/^(block|steal|change)$/)"
+            ".write": "auth != null && data.child('by').val() === auth.uid && !data.child('action').exists() && newData.child('by').val() === auth.uid && newData.child('deadline').val() === data.child('deadline').val() && newData.child('action').val().matches(/^(block|change)$/)"
           }
         }
       }

@@ -1,4 +1,4 @@
-// Unit tests for the order engine in index.html (MOVE / AMBUSH / DEFEND).
+// Unit tests for the order engine in index.html (MOVE / STEAL / AMBUSH / DEFEND).
 // Run with: node --test
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -31,8 +31,9 @@ test('expandOrder appends the sender codename to a bare DEFEND', () => {
   assert.equal(E.expandOrder('move a1  a2', 'red'), 'MOVE A1 A2');
 });
 
-test('DEFEND and AMBUSH are transmitted at the same length', () => {
+test('DEFEND, AMBUSH and STEAL are transmitted at the same length', () => {
   assert.equal(E.expandOrder('DEFEND', 'red').length, 'AMBUSH AQUA'.length);
+  assert.equal('STEAL A1 A2'.length, 'AMBUSH AQUA'.length);
 });
 
 test('parseOrder recognises each order type', () => {
@@ -40,6 +41,7 @@ test('parseOrder recognises each order type', () => {
   assert.deepEqual({ ...E.parseOrder('AMBUSH AQUA') }, { type: 'AMBUSH', target: 'blue' });
   assert.deepEqual({ ...E.parseOrder('DEFEND RUBY') }, { type: 'DEFEND', team: 'red' });
   assert.equal(E.parseOrder('AMBUSH BLUE'), null);
+  assert.deepEqual({ ...E.parseOrder('STEAL A1 B1') }, { type: 'STEAL', from: 'A1', to: 'B1' });
   assert.equal(E.parseOrder('STEAL AQUA'), null);
 });
 
@@ -106,13 +108,30 @@ test('applyOrder never mutates the grid it is given', () => {
 // ---------------- Cracker's choice ----------------
 const ALL = ['red', 'blue', 'green', 'yellow'];
 
-test('crackerOptions: CHANGE and targets only for an AMBUSH', () => {
-  const move = E.crackerOptions('MOVE A1 A2', 'blue', ALL);
-  assert.deepEqual([...move.actions], ['block', 'steal']);
-  assert.equal(move.targets.length, 0);
-  const amb = E.crackerOptions('AMBUSH LIME', 'blue', ALL); // red's ambush on green, cracked by blue
-  assert.deepEqual([...amb.actions], ['block', 'steal', 'change']);
-  assert.deepEqual([...amb.targets], ['red', 'yellow'], 'never the cracker or the original target');
+test('crackerOptions: only BLOCK for anything but an AMBUSH', () => {
+  for (const o of ['MOVE A1 A2', 'STEAL A1 B1', 'DEFEND RUBY']) {
+    const r = E.crackerOptions(o, 'blue', ALL, startGrid());
+    assert.deepEqual([...r.actions], ['block'], o);
+    assert.equal(r.targets.length, 0);
+  }
+});
+
+test('crackerOptions: CHANGE on an AMBUSH targets any base the cracker does not hold', () => {
+  const amb = E.crackerOptions('AMBUSH LIME', 'blue', ALL, startGrid()); // red's ambush on green, cracked by blue
+  assert.deepEqual([...amb.actions], ['block', 'change']);
+  assert.deepEqual([...amb.targets], ['red', 'green', 'yellow'], 'never the cracker itself');
+});
+
+test('crackerOptions: CHANGE works in a two-team game', () => {
+  // red ambushes blue; blue (the only other team) cracks it and can turn it on red
+  const r = E.crackerOptions('AMBUSH AQUA', 'blue', ['red', 'blue'], { A1: 'red', A3: 'blue' });
+  assert.deepEqual([...r.actions], ['block', 'change']);
+  assert.deepEqual([...r.targets], ['red']);
+});
+
+test('crackerOptions: no CHANGE once the cracker holds every other base', () => {
+  const r = E.crackerOptions('AMBUSH AQUA', 'blue', ['red', 'blue'], { A1: 'blue', A3: 'blue' });
+  assert.deepEqual([...r.actions], ['block']);
 });
 
 test('resolveOutcome: BLOCK leaves the board alone', () => {
@@ -120,10 +139,37 @@ test('resolveOutcome: BLOCK leaves the board alone', () => {
   assert.deepEqual({ ...r.grid }, startGrid());
 });
 
-test('resolveOutcome: STEAL still lets the sender\'s order go ahead', () => {
-  const r = E.resolveOutcome(startGrid(), 'AMBUSH AQUA', 'steal', ctx('red', { crackerColour: 'green' }));
+test('resolveOutcome: an uncracked order stands', () => {
+  const r = E.resolveOutcome(startGrid(), 'AMBUSH AQUA', 'stand', ctx('red'));
   assert.equal(r.valid, true);
   assert.equal(r.grid.A3, 'red');
+});
+
+test('STEAL takes an adjacent rival square', () => {
+  const g = { ...startGrid(), A2: 'blue' };
+  const r = E.applyOrder(g, 'STEAL A1 A2', ctx('red'));
+  assert.equal(r.valid, true);
+  assert.equal(r.grid.A2, 'red');
+  assert.equal(r.grid.A1, 'red', 'the FROM square is kept');
+});
+
+test('STEAL refuses bases, empty squares, own squares, non-adjacent and squares you do not start from', () => {
+  const g = { ...startGrid(), A2: 'blue', B1: 'red', C1: 'blue' };
+  assert.equal(E.applyOrder(g, 'STEAL A2 A3', ctx('blue')).valid, false, 'base (A3 is blue\'s own anyway)');
+  assert.equal(E.applyOrder({ ...g, A2: 'red' }, 'STEAL A2 A3', ctx('red')).valid, false, 'cannot steal a base');
+  assert.equal(E.applyOrder(g, 'STEAL A1 A2', ctx('green')).valid, false, 'must control FROM');
+  assert.equal(E.applyOrder(g, 'STEAL B1 B2', ctx('red')).valid, false, 'empty square');
+  assert.equal(E.applyOrder(g, 'STEAL A1 B1', ctx('red')).valid, false, 'already yours');
+  assert.equal(E.applyOrder(g, 'STEAL A1 C1', ctx('red')).valid, false, 'not adjacent');
+  assert.equal(E.validateOrderText('STEAL A1 B2', 'red').valid, false, 'diagonal');
+  assert.equal(E.validateOrderText('STEAL A2 A3', 'red').valid, false, 'base caught while typing');
+  assert.equal(E.validateOrderText('STEAL A1 A2', 'red').valid, true);
+});
+
+test('DEFEND does not protect ordinary squares from STEAL', () => {
+  const g = { ...startGrid(), A2: 'blue' };
+  const r = E.applyOrder(g, 'STEAL A1 A2', ctx('red', { defended: { blue: 1 }, round: 1 }));
+  assert.equal(r.valid, true);
 });
 
 test('AMBUSH on a codename no team is using is rejected', () => {
@@ -149,12 +195,11 @@ test('resolveOutcome: CHANGE fails against a defended base', () => {
   assert.equal(r.grid.F1, 'yellow');
 });
 
-test('scoreChanges: +1 interception always, STEAL moves one more point', () => {
-  assert.deepEqual({ ...E.scoreChanges('block', true) }, { interception: 1, stolen: 0, lost: 0 });
-  assert.deepEqual({ ...E.scoreChanges('steal', true) }, { interception: 1, stolen: 1, lost: 1 });
-  assert.deepEqual({ ...E.scoreChanges('change', true) }, { interception: 1, stolen: 0, lost: 0 });
-  assert.deepEqual({ ...E.scoreChanges('stand', true) }, { interception: 0, stolen: 0, lost: 0 });
-  assert.deepEqual({ ...E.scoreChanges('steal', false) }, { interception: 0, stolen: 0, lost: 0 });
+test('scoreChanges: +1 interception for BLOCK or CHANGE', () => {
+  assert.deepEqual({ ...E.scoreChanges('block', true) }, { interception: 1 });
+  assert.deepEqual({ ...E.scoreChanges('change', true) }, { interception: 1 });
+  assert.deepEqual({ ...E.scoreChanges('stand', true) }, { interception: 0 });
+  assert.deepEqual({ ...E.scoreChanges('block', false) }, { interception: 0 });
 });
 
 test('teamTotal: squares (bases worth 2) + interceptions + stolen - lost', () => {
