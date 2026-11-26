@@ -809,7 +809,7 @@
                     <p class="muted" style="margin-bottom:8px;">Click a square to cycle its controller — use this to apply the effect, or fix anything:</p>
                     <div class="tactical" id="resolve-grid"></div>
                     <div class="divider"></div>
-                    <button class="block" onclick="applyResolution()">Confirm &amp; next intercept</button>
+                    <button class="block" id="btn-confirm-resolve" onclick="applyResolution()">Confirm &amp; next intercept</button>
                 </div>
 
                 <div class="panel hidden" id="teacher-roundend-panel">
@@ -1818,7 +1818,7 @@
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const teams = { ...g.teams };
-                Object.keys(teams).forEach(id => { teams[id] = { ...teams[id], score: 0 }; });
+                Object.keys(teams).forEach(id => { teams[id] = { ...teams[id], score: 0, stolen: 0, lost: 0 }; });
                 const grid = baseGridFor(teams);
                 gameRef.update({
                     phase: 'submitting', round: 1, practice: false, teams, grid, submissions: {}, revealOrder: [], revealIdx: -1,
@@ -1876,6 +1876,7 @@
         function setCrackerChoice(action, target, auto) {
             return gameRef.child('currentReveal/choice').transaction(cur => {
                 if (!cur || cur.action) return; // nothing to choose, or already chosen
+                if (!auto && cur.by !== myTeamId) return; // only the cracking team can choose
                 if (!(cur.actions || []).includes(action)) return;
                 if (action === 'change' && !(cur.targets || []).includes(target)) return;
                 return { ...cur, action, target: action === 'change' ? target : null, auto: !!auto };
@@ -1884,6 +1885,12 @@
 
         /** Teacher override: stop waiting and BLOCK. */
         function skipCrackerChoice() { setCrackerChoice('block', null, true); }
+
+        /** The team credited for cracking the current intercept: the one recorded when the choice opened, if any. */
+        function creditedCracker(g) {
+            const cr = g.currentReveal || {};
+            return (cr.choice && cr.choice.by) || chooseCrackingWinner(g.crackAttempts || {});
+        }
 
         /** Colours currently held by a joined team. */
         function joinedColours(teams) { return Object.values(teams || {}).map(t => t.colour).filter(Boolean); }
@@ -1903,13 +1910,14 @@
             clearInterval(revealTimerHandle); revealTimerHandle = null;
             teacherResolvePanelOpen = true;
             resolveInFlight = false;
+            setResolveReady(false);
             pendingGrid = null;
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const cr = g.currentReveal;
                 const sub = g.submissions[cr.team];
                 const attempts = g.crackAttempts || {};
-                const crackedBy = chooseCrackingWinner(attempts);
+                const crackedBy = creditedCracker(g);
                 const choice = cr.choice || {};
                 const outcome = crackedBy ? (choice.action || 'block') : 'stand';
                 resolvingRevealIdx = g.revealIdx;
@@ -1934,6 +1942,7 @@
                 pendingGrid = result.grid;
                 renderResolveNote(result, outcome, crackedBy);
                 renderGridInto('resolve-grid', resolveBaseGrid, true);
+                setResolveReady(true);
             });
             document.getElementById('teacher-reveal-panel').classList.add('hidden');
             document.getElementById('teacher-resolve-panel').classList.remove('hidden');
@@ -1941,17 +1950,25 @@
 
         /** Recomputes the suggested grid whenever the teacher changes the outcome dropdown (e.g. switching between success/failure) in the resolve panel. */
         function onOutcomeChange() {
+            setResolveReady(false);
             gameRef.once('value').then(snap => {
                 const g = snap.val();
                 const cr = g.currentReveal;
                 const sub = g.submissions[cr.team];
                 const outcome = document.getElementById('resolve-outcome').value;
-                const crackedBy = document.getElementById('resolve-outcome').dataset.crackedBy || chooseCrackingWinner(g.crackAttempts || {});
+                const crackedBy = document.getElementById('resolve-outcome').dataset.crackedBy || creditedCracker(g);
                 const result = suggestGridForOutcome(resolveBaseGrid, g, cr, sub, outcome);
                 pendingGrid = result.grid;
                 renderResolveNote(result, outcome, crackedBy);
                 renderGridInto('resolve-grid', resolveBaseGrid, true);
+                setResolveReady(true);
             });
+        }
+
+        /** Enables Confirm only once the suggested board for the chosen outcome has been worked out. */
+        function setResolveReady(ready) {
+            const btn = document.getElementById('btn-confirm-resolve');
+            if (btn) btn.disabled = !ready;
         }
 
         /** Builds the human-readable summary line shown in the resolve panel describing the order's result and who (if anyone) cracked it. */
@@ -1972,7 +1989,7 @@
 
         /** Computes the suggested board-ownership grid that would result from applying the given order (MOVE/AMBUSH/DEFEND) and outcome, without committing it — the teacher can still hand-edit before applying. */
         function suggestGridForOutcome(baseGrid, g, cr, sub, outcome) {
-            const crackedBy = chooseCrackingWinner(g.crackAttempts || {});
+            const crackedBy = creditedCracker(g);
             const choice = cr.choice || {};
             return resolveOutcome(baseGrid, sub.plaintext, outcome, {
                 colour: teamColour(g, cr.team), crackerColour: crackedBy ? teamColour(g, crackedBy) : null,
@@ -2032,11 +2049,15 @@
                 if (nextIdx >= g.revealOrder.length) { updates.phase = 'roundend'; }
                 else { updates.revealIdx = nextIdx; }
 
-                gameRef.update(updates).then(() => {
+                return gameRef.update(updates).then(() => {
                     teacherResolvePanelOpen = false;
                     document.getElementById('teacher-resolve-panel').classList.add('hidden');
                     if (nextIdx < g.revealOrder.length) startReveal(g.revealOrder[nextIdx]);
                 });
+            }).catch(err => {
+                resolveInFlight = false; // let the teacher try again
+                console.error('Resolution failed:', err);
+                alert('Could not save this result — check the connection and click Confirm again.');
             });
         }
 
@@ -2481,10 +2502,10 @@
             const key = `${g.revealIdx}-${choice.deadline}`;
             if (choiceRenderedFor === key) return;
             choiceRenderedFor = key;
-            document.getElementById('tc-choice-actions').innerHTML = (choice.actions || []).map(a =>
+            document.getElementById('tc-choice-actions').innerHTML = (choice.actions || []).filter(a => CRACK_ACTIONS[a]).map(a =>
                 `<label class="choice-row"><input type="radio" name="crack-action" value="${a}" onchange="onCrackerChoiceChange()"> <strong>${CRACK_ACTIONS[a].label}</strong> <span class="muted">— ${CRACK_ACTIONS[a].effect}</span></label>`
             ).join('');
-            document.getElementById('tc-choice-target-list').innerHTML = (choice.targets || []).map(c =>
+            document.getElementById('tc-choice-target-list').innerHTML = (choice.targets || []).filter(c => COLOURS.includes(c)).map(c =>
                 `<label class="choice-row"><input type="radio" name="crack-target" value="${c}" onchange="onCrackerChoiceChange()"> <span class="team-swatch t-${c}"></span>${CODE_OF[c]} <span class="muted">(${cap(c)})</span></label>`
             ).join('');
             document.getElementById('tc-choice-targets').classList.add('hidden');
